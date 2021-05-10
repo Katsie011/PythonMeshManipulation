@@ -43,10 +43,11 @@ def generatePoints(total_num, x_dim, y_dim, z_dim =np.nan, stepSize = 0.5):
     else:
         x_pts = np.random.randint(x_dim+1, size=total_num)
         y_pts = np.random.randint(y_dim+1, size=total_num)
-        z_pts = np.random.randint(z_dim+1, size=total_num)
+        z_pts = np.random.rand(total_num) * z_dim
         pts = np.vstack((x_pts, y_pts, z_pts)).T
 
     return pts
+
 
 
 
