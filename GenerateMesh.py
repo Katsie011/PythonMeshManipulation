@@ -19,12 +19,15 @@ import numpy as np
 
 
 
-def makeGrid(points, xdim, ydim, zdim =None, stepSize = 0.5):
+def makeGrid(points, x_dim=np.nan, y_dim=np.nan, z_dim =np.nan, stepSize = 0.5):
     """
     Returns an array of sampled points all spaced out and structured
 
     """
-    pass
+    
+    if np.isnan(x_dim) or np.isnan(y_dim):
+        x_dim, y_dim = np.max(points)
+    
 
 
 def generatePoints(total_num, x_dim, y_dim, z_dim =np.nan, stepSize = 0.5):
