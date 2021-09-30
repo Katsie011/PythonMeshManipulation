@@ -1,10 +1,7 @@
 # PythonMeshManipulation
-Working on interacting with meshes in python.
+## Errors using dense interpolation written by my supervisor, Dr Paul Amayo
 
-Goal is to:
+Finding errors in meshes made from dense depth maps. 
 
-- [ ] Generate random meshes
-- [ ] Triangulate the meshes
-- [ ] Implement various coordinate systems
-  - [ ] Focus on Local Barycentric Coordinates
-- [ ] Start manipulating meshes
+Exploring using different techniques for feature selection. These features are then used to find the reconstruction error from the resulting sparse mesh.
+
