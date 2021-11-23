@@ -3,6 +3,23 @@
 
 import numpy as np
 import cv2
+import tensorflow as tf
+
+
+def get_dense(sparse, return_colour=False, mask=False):
+    colour, dense = depth_est.create_dense_depth(sparse)
+
+    if mask:
+        return dense, (dense > -1)
+
+    if return_colour:
+        if mask:
+            return colour, dense, dense > -1
+
+        return colour, dense
+
+    return dense
+
 
 # TODO: Fix masking
 class DataGenerator(tf.keras.utils.Sequence):
@@ -95,3 +112,11 @@ class DataGenerator(tf.keras.utils.Sequence):
             )
 
         return x, y
+
+
+
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, '/home/kats/Documents/Repos/aru-core/build/lib')
+    import aru_py_mesh
+    depth_est = aru_py_mesh.PyDepth("/home/kats/Documents/Repos/aru-core/src/mesh/config/mesh_depth.yaml")
