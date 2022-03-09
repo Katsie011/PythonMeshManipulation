@@ -23,7 +23,6 @@ from sklearn.preprocessing import normalize
 from scipy.spatial import ConvexHull
 import time
 from matplotlib import cm
-
 # import aru_py_mesh
 import sys
 
@@ -31,9 +30,9 @@ sys.path.insert(0, "/home/kats/Documents/My Documents/UCT/Masters/Code/Modular f
 # import DatasetHandler
 import ImgFeatureExtactorModule as ft
 import TriangleUtilityFunctions
-
 # import Kitti_Dataset_Files_Handler
 import pykitti
+from HyperParameters import *
 
 # /home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/2011_09_26/2011_09_26_drive_0001_sync
 base = r"/home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/"
@@ -56,19 +55,12 @@ from Functions_TunableReconstruction import *
 #       Declaring Hyperparameters
 # -----------------------------------------------------------------------------------------------------------------
 
-NUM_INITIAL_FEATURES = 50
-LOWE_DISTANCE_RATIO = 0.8
-MAX_DISTANCE = 100  # meters
-MAX_NUM_FEATURES_DETECT = 500
-MIN_DISTANCE = 2
-TRIANGLE_SAMPLES_PER_PIX_SQUARED = 1 / 10 ** 2
-DETECTOR = 'ORB'
-INTERPOLATING_POINTS = 2000
+
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Extracting Features
 # -----------------------------------------------------------------------------------------------------------------
-
+print("Extracting features")
 img0 = np.array(data.get_cam0(0))
 img1 = np.array(data.get_cam1(0))
 
@@ -103,6 +95,8 @@ for i, m in enumerate(good):
 # -----------------------------------------------------------------------------------------------------------------
 #       Stereo Depth
 # -----------------------------------------------------------------------------------------------------------------
+print("Setting up stereo")
+
 K, R, t, _, _, _, _ = cv2.decomposeProjectionMatrix(data.calib.P_rect_10)
 t = t[:3] / t[3]  # normalising translation vector
 t.squeeze()
@@ -135,6 +129,7 @@ interpolated_pts = barycentric_interpolation(d_mesh, ft_uvd, interpolated_uv)
 # -----------------------------------------------------------------------------------------------------------------
 #       Cost Calculation
 # -----------------------------------------------------------------------------------------------------------------
+print("Calculating costs")
 
 new_census = np.abs(get_disparity_census_cost(interpolated_pts, img0, img1, K, t, num_disparity_levels=5))
 
@@ -171,38 +166,118 @@ C_g[min_cost_idx] = np.hstack((interpolated_pts[min_cost_idx, :2],
 C_g_d_arg = np.argmin(new_census, axis=1)
 C_b_d_arg = np.argmax(new_census, axis=1)
 
-# Using the best match (new_census.min)
+# # Using the best match (new_census.min)
+# C_b[max_cost_idx] = np.hstack((interpolated_pts[max_cost_idx, :2],
+#                                depth_to_disparity(interpolated_pts[max_cost_idx, 2], K, t).reshape((-1, 1)),
+#                                new_census.min(axis=1)[max_cost_idx].reshape((-1, 1))))
+
+# Choosing bad points as compliment of good points
+max_cost_idx = ~min_cost_idx
 C_b[max_cost_idx] = np.hstack((interpolated_pts[max_cost_idx, :2],
                                depth_to_disparity(interpolated_pts[max_cost_idx, 2], K, t).reshape((-1, 1)),
                                new_census.min(axis=1)[max_cost_idx].reshape((-1, 1))))
 
 
+
 print(f"Total num census cost pts {len(new_census)}")
-print(f"Number of good pts to resample {(C_g.sum(axis=1) !=-3).sum()}")
-print(f"Number of bad pts to resample {(C_b.sum(axis=1) !=-3).sum()}")
+print("Number of good interpolated points:", np.sum(np.sum(C_g, axis=1)!=-C_g.shape[1]))
+print("Number of bad interpolated points:", np.sum(np.sum(C_b, axis=1)!=-C_b.shape[1]))
 
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Resampling
 # -----------------------------------------------------------------------------------------------------------------
+print("Support Resampling")
+pts_to_resample = C_b[np.all(C_b!=-1, axis=1),:3]
 
-# Need to implement selection of high cost points for the occupancy grids
-# Need to implement selection of high cost points for the occupancy grids
-# Need to implement selection of high cost points for the occupancy grids
-# Need to implement selection of high cost points for the occupancy grids
-# Need to implement selection of high cost points for the occupancy grids
-# Need to implement selection of high cost points for the occupancy grids
-# Need to implement selection of high cost points for the occupancy grids
+# Inplementing selection of high cost points for the occupancy grids
+
+support_pts = support_resampling(img0, img1, pts_to_resample)
+support_pts = support_pts[np.logical_and(np.logical_and(
+    np.all(support_pts>0, axis=1), (support_pts[:,0]<img0.shape[1])), (support_pts[:,1]<img0.shape[0] ))]
+
+
+
+# -----------------------------------------------------------------------------------------------------------------
+#       Adjusting depth for resampled points
+# -----------------------------------------------------------------------------------------------------------------
+print("Adjusting depth for resampled points")
+
 
 
 # Epipolar search
 F, mask = cv2.findFundamentalMat(left_uv.astype(np.int32),right_uv.astype(np.int32),cv2.FM_LMEDS) # getting the fundamental matrix
+
+# print("Found F:\n",F)
 # Probably need to filter the matches used for this to only good points
 
-# Need to search along the epipolar lines
+# Searching for points along epipolar lines:
+resampled = np.stack((pts_to_resample[:,0], pts_to_resample[:,1], get_depth_with_epipolar(img0, img1, pts_to_resample, K=K, t=t, F=F)), axis=-1)
+resampled = resampled[resampled[:,2]<=MAX_DISTANCE]
+
+support_resampled = np.stack((support_pts[:,0], support_pts[:,1], get_depth_with_epipolar(img0, img1, support_pts, K=K, t=t, F=F)), axis=-1)
+support_resampled = support_resampled[support_resampled[:,2]<=MAX_DISTANCE]
+
+
+# good_resampled = np.stack((C_g[:,0], C_g[:,1], get_depth_with_epipolar(img0, img1, C_g)), axis=-1)
+# good_resampled = good_resampled[good_resampled[:,2]<=MAX_DISTANCE
 
 
 
 
 
+new_pts = np.vstack((ft_uvd, resampled, support_resampled))
+old_pts = np.vstack((ft_uvd, pts_to_resample, support_pts))
 
+print(f"Now have {len(new_pts)} new interpolated points")
+# Displaying output:
+
+fig,ax = plt.subplots(2,2, figsize=(30,10))
+fig.tight_layout(pad=3.0)
+
+ax[0,0].imshow(img0, 'gray')
+ax[0,0].axis('off')
+plot_mesh(d_mesh, ft_uvd, a=ax[0,0])
+sc = ax[0,0].scatter(ft_uvd[:,0], ft_uvd[:,1], c= ft_uvd[:,2], cmap='jet')
+ax[0,0].set_title("Original mesh points")
+divider = make_axes_locatable(ax[0,0])
+cax = divider.append_axes("right", size="5%", pad=0.05)
+cbar = plt.colorbar(sc, cax = cax)
+cbar.set_label("Depth [m]")
+
+ax[0,1].imshow(img0, 'gray')
+ax[0,1].axis('off')
+
+ind = old_pts[:,2]<MAX_DISTANCE
+sc = ax[0,1].scatter(old_pts[ind,0], old_pts[ind,1], c= old_pts[ind,2], cmap='jet')
+ax[0,1].set_title("Original interpolated points")
+divider = make_axes_locatable(ax[0,1])
+cax = divider.append_axes("right", size="5%", pad=0.05)
+cbar = plt.colorbar(sc, cax = cax)
+cbar.set_label("Depth [m]")
+
+
+
+ax[1,0].imshow(img0, 'gray')
+ax[1,0].axis('off')
+sc = ax[1,0].scatter(new_pts[:,0], new_pts[:,1], c=new_pts[:,2], cmap='jet')
+ax[1,0].set_title("After resampling, before bounding")
+divider = make_axes_locatable(ax[1,0])
+cax = divider.append_axes("right", size="5%", pad=0.05)
+cbar = plt.colorbar(sc, cax = cax)
+cbar.set_label("Depth [m]")
+
+
+new_pts = new_pts[new_pts[:,2]<MAX_DISTANCE]
+
+
+ax[1,1].imshow(img0, 'gray')
+ax[1,1].axis('off')
+sc = ax[1,1].scatter(new_pts[:,0], new_pts[:,1], c=new_pts[:,2], cmap='jet')
+ax[1,1].set_title("After resampling and discarding all further than 100m away")
+divider = make_axes_locatable(ax[1,1])
+cax = divider.append_axes("right", size="5%", pad=0.05)
+cbar = plt.colorbar(sc, cax = cax)
+cbar.set_label("Depth [m]")
+
+plt.show()

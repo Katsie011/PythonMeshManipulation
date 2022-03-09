@@ -1,3 +1,14 @@
+# -----------------------------------------------------------------------------------------------------------------
+#       Importing libraries
+# -----------------------------------------------------------------------------------------------------------------
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+from matplotlib import cm
+# from scipy.spatial import Delaunay
+from scipy.spatial.distance import hamming
+from HyperParameters import *
+
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Feature Extraction
@@ -35,7 +46,6 @@ def depth_to_disparity(Z, K, t):
 
     d = B * f / Z
     return d
-
 
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -80,7 +90,7 @@ def Barycentric(pts, triangle):
     Output: Barycentric coords in form [ϕ1, ϕ2, ϕ3]
     """
 
-    a, b, c = tri[:, :2]
+    a, b, c = triangle[:, :2]
     if pts.shape[1] == 3:
         pts = pts[:, :2]
 
@@ -125,7 +135,7 @@ def barycentric_interpolation(mesh, mesh_pts_3d, sample_pts, valid_only=True):
         if valid_only:
             if not np.all(valid_bcs(bcs)):
                 continue
-        interpolated[i] = bcs @ mesh_pts_3d[d_mesh.simplices[tri]]
+        interpolated[i] = bcs @ mesh_pts_3d[mesh.simplices[tri]]
 
     if valid_only:
         interpolated = interpolated[np.all(interpolated != -1, axis=1), :]
@@ -133,7 +143,7 @@ def barycentric_interpolation(mesh, mesh_pts_3d, sample_pts, valid_only=True):
     return interpolated
 
 
-def plot_mesh(mesh, mesh_pts_3d, a=None, use_depth=True, cmap_=cm.jet):
+def plot_mesh(mesh, mesh_pts_3d, a=None, use_depth=True, cmap_=cm.jet, max_distance=MAX_DISTANCE):
     if isinstance(a, type(None)):
         print("No Axis input, creating new figure")
         f, a = plt.subplots(1, 1)
@@ -143,7 +153,7 @@ def plot_mesh(mesh, mesh_pts_3d, a=None, use_depth=True, cmap_=cm.jet):
         verticies = tris[i]
         vert_plot = verticies[[0, 1, 2, 0], :]
         if use_depth:
-            a.plot(vert_plot[:, 0], vert_plot[:, 1], color=cmap_((tris[i, :, 2].sum() / 3) / MAX_DISTANCE))
+            a.plot(vert_plot[:, 0], vert_plot[:, 1], color=cmap_((tris[i, :, 2].sum() / 3) / max_distance))
         else:
             a.plot(vert_plot[:, 0], vert_plot[:, 1], color=cmap_(i / len(mesh.simplices)))
 
@@ -151,16 +161,14 @@ def plot_mesh(mesh, mesh_pts_3d, a=None, use_depth=True, cmap_=cm.jet):
         a.scatter(verticies[:, 0], verticies[:, 1])
 
 
-
-
 # -----------------------------------------------------------------------------------------------------------------
 #       Cost Functions
 # -----------------------------------------------------------------------------------------------------------------
 
 def census(window):
-    mid_pixel = (np.array((window.shape))/2).round().astype(int)
+    mid_pixel = (np.array((window.shape)) / 2).round().astype(int)
     mid_pixel = window[mid_pixel[0], mid_pixel[1]]
-    c = window>mid_pixel
+    c = window > mid_pixel
     c = c.flatten().astype(int)
     return c
 
@@ -232,9 +240,147 @@ def get_disparity_census_cost(vud, imgL, imgR, K, t, num_disparity_levels=3, win
     return costs
 
 
+def epipolar_search(imgl, imgr, poi, epipolar_search_size, epipolar_line=None, window_size=5):
+    r""" Epipolar search for points that correspond.
+
+    Assuming: rectified stereo image.
+    Will only look in u direction of image
+    """
+
+    w = window_size // 2
+    #     us = np.arange(-epipolar_search_size//2, epipolar_search_size//2+1, dtype=int)+poi[0].round().astype(int)
+    us = np.arange(-epipolar_search_size, 1, dtype=int) + poi[0].round().astype(
+        int)  # searching the right image for a match so the point will lie on the left of where it is in the left img
+
+    if np.all(epipolar_line != None):
+        a, b, c = epipolar_line.T
+        vs = np.round((-c - a * u) / b).astype(int).squeeze()
+    else:
+        vs = poi[1] * np.ones(len(us))
+
+    target = imgl[poi[1].astype(int) - w:poi[1].astype(int) + w + 1, poi[0].astype(int) - w:poi[0].astype(int) + w + 1]
+
+    #     plt.imshow(target, 'gray'); plt.title("target"); plt.show()
+
+    scores = np.stack((-(us - poi[0]), -1 * np.ones(len(us))), axis=-1)
+    for i, pt in enumerate(zip(us, vs.round().astype(int))):
+        if w < pt[0] < imgl.shape[1] - w and w < pt[1] < imgl.shape[0] - w:
+            search_area = imgr[pt[1] - w:pt[1] + w + 1, pt[0] - w:pt[0] + w + 1]
+            if target.shape != search_area.shape:
+                print(f"Target shape:{target.shape} \t Search shape:{search_area.shape}")
+                continue
+            scores[i, 1] = get_census_cost(target, search_area)
+    #             plt.imshow(search_area, 'gray');plt.title(f"i:{i}, u:{u}");plt.show()
+
+    return scores[::-1]
+
+
+def get_depth_with_epipolar(imgl, imgr, pts, K, t, F, window_size=10, max_distance=MAX_DISTANCE,
+                            min_distance=MIN_DISTANCE,
+                            use_epipolar_line=False):
+    e_s = depth_to_disparity(min_distance, K, t).round().astype(int)
+    ds = np.zeros(len(pts))
+
+    for j, pt in enumerate(pts):
+        if use_epipolar_line:
+            line = cv2.computeCorrespondEpilines(pt[:, 2], 1, F)
+            c = epipolar_search(imgl, imgr, pt, e_s, epipolar_line=line, window_size=10)
+        else:
+            c = epipolar_search(imgl, imgr, pt, e_s, window_size=10)
+
+        ds[j] = get_epipolar_cost_min(c)
+
+    new_d = ds.copy()
+    new_d[ds == 0] = max_distance
+    new_d[ds != 0] = disparity_to_depth(ds[ds != 0], K, t)
+    #     new_d[new_d>max_distance] = max_distance
+    return new_d
+
+
+def get_epipolar_cost_min(c):
+    pos = 0
+    c_min = c[0, 1]
+    for i_, cost in c:
+        if cost < c_min:
+            c_min = cost
+            pos = i_
+    return pos
 
 
 # -----------------------------------------------------------------------------------------------------------------
 #
 # -----------------------------------------------------------------------------------------------------------------
+
+# def support_resampling(imgl, imgr, pts, sz_occ=32, census_window_size=10,
+#                        pts_per_occ=NUM_SUPPORT_PTS_PER_OCCUPANCY_GRID, verbose=False):
+#     to_sample = -np.ones((len(pts) * pts_per_occ, 3))
+#     c = 0
+#     w = census_window_size // 2
+#     occ = -1 * np.ones((sz_occ, sz_occ))
+#
+#     for i, [u, v, d] in enumerate(pts.round().astype(int)):
+#         key = imgl[v - w: v + w + 1, u - w: u + w + 1]
+#
+#         for x_i, x in enumerate(np.arange(u - sz_occ // 2, u + sz_occ // 2, dtype=int)):
+#             for y_i, y in enumerate(np.arange(v - sz_occ // 2, v + sz_occ // 2, dtype=int)):
+#                 l = x - w
+#                 r = x + w + 1
+#                 up = y - w
+#                 down = y + w + 1
+#                 check_window = imgr[up:down, l:r]
+#                 if key.shape != check_window.shape != (census_window_size, census_window_size):
+#                     if verbose:
+#                         print("Window sizes not equal")
+#                         print(check_window.shape, "!=", key.shape)
+#                     break
+#                 occ[y_i, x_i] = hamming(census(key), census(check_window))
+#             if key.shape != check_window.shape != (census_window_size, census_window_size):
+#                 break
+#
+#         grad = cv2.Sobel(occ, cv2.CV_64F, 1, 1)
+#         resample = np.unravel_index(np.argpartition(grad.flatten(), -pts_per_occ)[-pts_per_occ:], occ.shape)
+#
+#         to_sample[c:c + len(resample)] = np.array((u - (resample[1] - sz_occ // 2), v - (resample[0] - sz_occ // 2),
+#                                                    occ[resample])).T
+#         c += len(resample)
+#
+#     return to_sample
+
+def support_resampling(imgl, imgr, pts, sz_occ=32,  census_window_size=10,
+                       pts_per_occ =  NUM_SUPPORT_PTS_PER_OCCUPANCY_GRID, verbose=False):
+    to_sample = -np.ones((len(pts)*pts_per_occ, 3))
+    c = 0
+    w = census_window_size//2
+    occ = -1 * np.ones((sz_occ, sz_occ))
+
+    for i, [u, v, d] in  enumerate(pts.round().astype(int)):
+        key = imgl[v - w : v+w+1, u-w : u+w+1]
+
+        for x_i,x in enumerate(np.arange(u-sz_occ//2, u+sz_occ//2, dtype=int)):
+                for y_i, y in enumerate(np.arange(v-sz_occ//2, v+sz_occ//2, dtype=int)):
+                    l = x-w
+                    r = x+w+1
+                    up = y-w
+                    down = y+w+1
+                    check_window = imgr[up:down, l:r]
+                    if key.shape != check_window.shape != (census_window_size, census_window_size):
+                        if verbose:
+                            print("Window sizes not equal")
+                            print(check_window.shape, "!=", key.shape)
+                        break
+                    occ[y_i,x_i] = hamming(census(key), census(check_window))
+                if key.shape != check_window.shape != (census_window_size, census_window_size):
+                    break
+
+        grad = cv2.Sobel(occ,cv2.CV_64F,1,1)
+        resample = np.unravel_index(np.argpartition(grad.flatten(), -pts_per_occ)[-pts_per_occ:], occ.shape)
+#         resample = np.unravel_index(np.argsort(grad.flatten())[-pts_per_occ:], occ.shape)
+#         np.argpartition(δ.flatten(), -pts_per_occ)[-pts_per_occ:]
+    #     resmpl = np.unravel_index(np.argsort(occ.flatten())[-NUM_SUPPORT_PTS_PER_OCCUPANCY:], occ.shape)
+        r = np.stack((u - (resample[1]-sz_occ//2), v- (resample[0]-sz_occ//2), occ[resample]), axis=-1)
+        to_sample[c:c+len(r)] =r
+        c += len(resample)
+
+    return to_sample
+
 
