@@ -229,6 +229,9 @@ support_resampled = support_resampled[support_resampled[:,2]<=MAX_DISTANCE]
 new_pts = np.vstack((ft_uvd, resampled, support_resampled))
 old_pts = np.vstack((ft_uvd, pts_to_resample, support_pts))
 
+
+
+
 print(f"Now have {len(new_pts)} new interpolated points")
 # Displaying output:
 
@@ -281,3 +284,23 @@ cbar = plt.colorbar(sc, cax = cax)
 cbar.set_label("Depth [m]")
 
 plt.show()
+
+
+fig, ax = plt.subplots(1,1, figsize=(20,10))
+fig.tight_layout()
+ax.axis('off')
+ax.imshow(img0, 'gray')
+plot_mesh(Delaunay(new_pts[:,:2]), new_pts, a=ax)
+
+
+sc = ax.scatter(new_pts[:,0], new_pts[:,1], c=new_pts[:,2], cmap='jet')
+ax.set_title(f"Mesh produced using {len(new_pts)} points")
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+cbar = plt.colorbar(sc, cax = cax)
+cbar.set_label("Depth [m]")
+
+plt.show()
+
+# ----------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------

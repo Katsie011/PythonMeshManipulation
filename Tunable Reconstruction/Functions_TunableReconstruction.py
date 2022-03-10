@@ -372,11 +372,9 @@ def support_resampling(imgl, imgr, pts, sz_occ=32,  census_window_size=10,
                 if key.shape != check_window.shape != (census_window_size, census_window_size):
                     break
 
-        grad = cv2.Sobel(occ,cv2.CV_64F,1,1)
-        resample = np.unravel_index(np.argpartition(grad.flatten(), -pts_per_occ)[-pts_per_occ:], occ.shape)
-#         resample = np.unravel_index(np.argsort(grad.flatten())[-pts_per_occ:], occ.shape)
-#         np.argpartition(δ.flatten(), -pts_per_occ)[-pts_per_occ:]
-    #     resmpl = np.unravel_index(np.argsort(occ.flatten())[-NUM_SUPPORT_PTS_PER_OCCUPANCY:], occ.shape)
+        resample = np.unravel_index(np.argsort(occ.flatten())[-pts_per_occ:], occ.shape)
+        #np.argpartition(δ.flatten(), -pts_per_occ)[-pts_per_occ:]
+        #resmpl = np.unravel_index(np.argsort(occ.flatten())[-NUM_SUPPORT_PTS_PER_OCCUPANCY:], occ.shape)
         r = np.stack((u - (resample[1]-sz_occ//2), v- (resample[0]-sz_occ//2), occ[resample]), axis=-1)
         to_sample[c:c+len(r)] =r
         c += len(resample)
