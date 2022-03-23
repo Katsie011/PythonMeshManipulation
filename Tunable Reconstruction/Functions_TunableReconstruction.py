@@ -43,7 +43,10 @@ def depth_to_disparity(Z, K, t):
     if len(t.shape) > 1:
         t = t.squeeze()
     B = t[0]
-
+    if np.size(Z)>1:
+        Z[Z==0] = 0.000001
+    else:
+        if Z==0: Z=0.00001
     d = B * f / Z
     return d
 

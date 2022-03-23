@@ -20,19 +20,21 @@ global R
 global t
 
 K, R, t, _, _, _, _ = cv2.decomposeProjectionMatrix(data.calib.P_rect_10)
+t = t[:3] / t[3]  # normalising translation vector
+t.squeeze()
 
 
 NUM_INITIAL_FEATURES = 200
 LOWE_DISTANCE_RATIO = 0.8
-MAX_DISTANCE = 100  # meters
+MAX_DISTANCE = 100  # meters  This is 4px disparity
 MAX_NUM_FEATURES_DETECT = 1000
 MIN_DISTANCE = 2
 TRIANGLE_SAMPLES_PER_PIX_SQUARED = 1 / 10 ** 2
 # DETECTOR = 'ORB'
 DETECTOR = 'SIFT'
 INTERPOLATING_POINTS = 500
-NUM_SUPPORT_PTS_PER_OCCUPANCY_GRID = 5
-
+NUM_SUPPORT_PTS_PER_OCCUPANCY_GRID = 2
+RESAMPLING_ITERATIONS = 5
 
 
 
