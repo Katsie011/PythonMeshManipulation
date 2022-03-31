@@ -221,7 +221,7 @@ def resample_iterate(imgl, imgr, pts_resampling, eval_resampling_costs=False, ve
 
 
 def iterative_recon(img_l, img_r, num_iterations=RESAMPLING_ITERATIONS, num_pts_per_resample=25,
-                    eval_resampling_costs=False, before_after_plots=False,
+                    eval_resampling_costs=False, frame = None, before_after_plots=False,
                     plot_its=False, save_fig_path=None, verbose=False):
     # --------------------------------------
     #       Getting feature depth
@@ -314,7 +314,10 @@ def iterative_recon(img_l, img_r, num_iterations=RESAMPLING_ITERATIONS, num_pts_
             ax_its[its, 1].set_title(f"Resampling Iteration {its}")
 
     if plot_its:
-        title_its = f"Plot of iterations for frame: #{frame}"
+        if frame is not None:
+            title_its = f"Plot of iterations for frame: #{frame}"
+        else:
+            title_its = "Plot of iterations"
         fig_its.suptitle(title_its, fontsize=24)
         if save_fig_path:
             save_fig = os.path.join(save_fig_path, title_its + ".png")
@@ -335,7 +338,11 @@ def iterative_recon(img_l, img_r, num_iterations=RESAMPLING_ITERATIONS, num_pts_
         ax_bna[1, 1].triplot(depth_mesh_pts[:, 0], depth_mesh_pts[:, 1], depth_mesh.simplices.copy())
         ax_bna[1, 1].set_title("Final Mesh")
 
-        title = f"Tunable Reconstruction For Frame: #{frame}"
+        if frame is not None:
+            title = f"Tunable Reconstruction For Frame: #{frame}"
+        else:
+            title = "Tunable Reconstruction"
+
         fig_bna.suptitle(title, fontsize=24)
         ax_bna[1, 0].axis('off')
         ax_bna[1, 1].axis('off')
@@ -349,6 +356,8 @@ def iterative_recon(img_l, img_r, num_iterations=RESAMPLING_ITERATIONS, num_pts_
 
 
 if __name__ == "__main__":
+    import ErrorEvaluation
+
     print("Loading database")
     base = r"/home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/"
     date = "2011_09_26"
@@ -362,115 +371,8 @@ if __name__ == "__main__":
         img_left = np.array(data.get_cam0(frame), dtype=np.uint8)
         img_right = np.array(data.get_cam1(frame), dtype=np.uint8)
 
-        iterative_recon(img_left, img_right,
-                        save_fig_path="/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation"
-                                      "/Figures/TunableReconstruction", before_after_plots=True)
+        mesh, pts = iterative_recon(img_left, img_right,
+                                    save_fig_path="/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation"
+                                                  "/Figures/TunableReconstruction", before_after_plots=True)
 
-        #
-        # # --------------------------------------
-        # #       Getting feature depth
-        # # --------------------------------------
-        # ft_pts = extract_fts(data, img_l, img_r)
-        # # Building mesh
-        # mesh = Delaunay(ft_pts[:, :2])
-        # mesh_pts = ft_pts.copy()
-        #
-        # print("Plotting initial points")
-        # fig, ax = plt.subplots(2, 2, figsize=(22, 7.5))
-        # fig.tight_layout(pad=3)
-        # ax[0, 0].imshow(img_l, 'gray')
-        # sc = ax[0, 0].scatter(mesh_pts[:, 0], mesh_pts[:, 1], c=mesh_pts[:, 2], cmap='jet')
-        # divider = make_axes_locatable(ax[0, 0])
-        # cax = divider.append_axes("right", size="5%", pad=0.05)
-        # cbar = plt.colorbar(sc, cax=cax)
-        # cbar.set_label("Depth [m]")
-        # ax[0, 0].set_title("Initial Points")
-        #
-        # ax[0, 1].imshow(img_l, 'gray')
-        # plot_mesh(mesh, mesh_pts, a=ax[0, 1])
-        # ax[0, 1].set_title("Initial mesh")
-        # ax[0, 0].axis('off')
-        # ax[0, 1].axis('off')
-        # # plt.show()
-        # print("Done plotting")
-        #
-        # """
-        # Now to iterate over the resampling part:
-        #      Interpolate mesh
-        #      Get cost for interpolated points
-        #      Resample worst n points
-        #      Add good points and resampled points to mesh vertices list
-        #      Repeat
-        # """
-        # # --------------------------------------
-        # #       Interpolating
-        # # --------------------------------------
-        # pts_to_still_resample = interpolate_pts(img_l, mesh, mesh_pts)
-        # num_resample = 25
-        #
-        # if plot_iterations: fig, ax = plt.subplots(RESAMPLING_ITERATIONS, 2, figsize=(22, 3.7 * RESAMPLING_ITERATIONS))
-        # for i in range(RESAMPLING_ITERATIONS):
-        #
-        #     # --------------------------------------
-        #     #       Cost Calculation
-        #     # --------------------------------------
-        #
-        #     cost_interpolated, good_cost_pts, bad_cost_pts = calculate_costs(img_l, img_r, pts_to_still_resample,
-        #                                                                      mesh_pts)
-        #     idxs = np.argsort(bad_cost_pts[:, -1])[::-1]
-        #     resample_these = bad_cost_pts[idxs[:num_resample], :3]
-        #     pts_to_still_resample = bad_cost_pts[idxs[num_resample:]]
-        #     # cost_bad_pts = n x [u, v, d, c]
-        #     EVAL_RESAMPLING_COST = True
-        #
-        #     resampled_pts = resample_iterate(img_l, img_r, resample_these)
-        #
-        #     # --------------------------------------
-        #     #       Merging with mesh
-        #     # --------------------------------------
-        #
-        #     mesh_pts = np.vstack((mesh_pts, good_cost_pts[:, :3], resampled_pts))
-        #     mesh_pts = mesh_pts[mesh_pts[:, 2] < MAX_DISTANCE]
-        #     mesh = Delaunay(mesh_pts[:, :2])
-        #
-        #     # --------------------------------------
-        #     #       Plots
-        #     # --------------------------------------
-        #     if plot_iterations:
-        #         fig.tight_layout()
-        #         ax[i, 0].imshow(img_l, 'gray')
-        #         ax[i, 0].axis('off')
-        #         sc = ax[i, 0].scatter(mesh_pts[:, 0], mesh_pts[:, 1], c=mesh_pts[:, 2], cmap='jet')
-        #         divider = make_axes_locatable(ax[i, 0])
-        #         cax = divider.append_axes("right", size="5%", pad=0.05)
-        #         cbar = plt.colorbar(sc, cax=cax)
-        #         cbar.set_label("Depth [m]")
-        #
-        #         ax[i, 1].imshow(img_l, 'gray')
-        #         ax[i, 1].axis('off')
-        #         # ax[1].triplot(mesh_pts[:,0], mesh_pts[:,1], mesh.simplices.copy())
-        #         sc = ax[i, 1].scatter(resampled_pts[:, 0], resampled_pts[:, 1], c=resampled_pts[:, 2], cmap='jet')
-        #         divider = make_axes_locatable(ax[i, 1])
-        #         cax = divider.append_axes("right", size="5%", pad=0.05)
-        #         cbar = plt.colorbar(sc, cax=cax)
-        #         cbar.set_label("Depth [m]")
-        #         ax[i, 1].set_title(f"Resampling Iteration {i}")
-        #
-        # if plot_iterations: plt.show()
-        #
-        # ax[1, 0].imshow(img_l, 'gray')
-        # sc = ax[1, 0].scatter(mesh_pts[:, 0], mesh_pts[:, 1], c=mesh_pts[:, 2], cmap='jet')
-        # divider = make_axes_locatable(ax[1, 0])
-        # cax = divider.append_axes("right", size="5%", pad=0.05)
-        # cbar = plt.colorbar(sc, cax=cax)
-        # cbar.set_label("Depth [m]")
-        # ax[1, 0].set_title("Final Mesh Points")
-        #
-        # ax[1, 1].imshow(img_l, 'gray')
-        # plot_mesh(mesh, mesh_pts, a=ax[1, 1])
-        # ax[1, 1].set_title("Final Mesh")
-        #
-        # fig.suptitle(f"For Frame: #{frame}", fontsize=24)
-        # ax[1, 0].axis('off')
-        # ax[1, 1].axis('off')
-        # plt.show()
+        # lidar_img = y = P(i) @ R(0) @ Tvelo_cam @ x
