@@ -10,7 +10,7 @@ sys.path.insert(0, '/home/kats/Documents/Repos/aru-core/build/lib')
 import aru_py_mesh
 
 sys.path.append('./ModularFiles/')
-import DatasetHandler
+import KittiDatasetHandler
 import numpy as np
 
 

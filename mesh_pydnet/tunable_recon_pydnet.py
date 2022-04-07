@@ -10,5 +10,8 @@ import sys
 
 from TunableReconstruction import IterativeTunableReconstructionPipeline
 
+data_dir = r"/home/kats/Documents/My Documents/Datasets/Husky/HUSKY Bag 2022-02-23-09-05-41/"
+
+
 
 

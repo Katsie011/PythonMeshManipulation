@@ -353,7 +353,7 @@ if __name__ == "__main__":
     import ErrorEvaluation
 
     print("Loading database")
-    base = r"/home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/"
+    base = r"/home/kats/Datasets/KITTI_cvlibs/"
     date = "2011_09_26"
     drive = "0001"
     data = pykitti.raw(base, date, drive)
