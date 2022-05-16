@@ -1,13 +1,11 @@
 # -----------------------------------------------------------------------------------------------------------------
 #       Importing libraries
 # -----------------------------------------------------------------------------------------------------------------
-import numpy as np
-import cv2
 import matplotlib.pyplot as plt
 from matplotlib import cm
 # from scipy.spatial import Delaunay
 from scipy.spatial.distance import hamming
-from HyperParameters import *
+from PythonMeshManipulation.mesh_pydnet.HyperParameters import *
 
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -117,7 +115,7 @@ def get_barycentric_coords(mesh, pts):
     for i in range(pts.shape[0]):
         pt = pts[i, :2]
         t = mesh.find_simplex(pt)
-        b = mesh.transform[t, :2].dot(np.transpose(pt.reshape((1, -1)) - mesh.transform[t, 2]))
+        b = mesh.transform[HuskyCalib.t_cam0_velo, :2].dot(np.transpose(pt.reshape((1, -1)) - mesh.transform[HuskyCalib.t_cam0_velo, 2]))
         bcs[i] = np.c_[np.transpose(b), 1 - b.sum(axis=0)]
     return bcs
 
@@ -144,6 +142,18 @@ def barycentric_interpolation(mesh, mesh_pts_3d, sample_pts, valid_only=True):
         interpolated = interpolated[np.all(interpolated != -1, axis=1), :]
 
     return interpolated
+
+
+def interpolate_pts(imgl, d_mesh, ft_uvd, verbose=False):
+    δ = cv2.Laplacian(imgl, cv2.CV_64F)
+    δ = np.abs(δ)
+
+    idx = np.argpartition(δ.flatten(), -INTERPOLATING_POINTS)[-INTERPOLATING_POINTS:]
+    gradient_pts = np.unravel_index(idx, imgl.shape)
+    interpolated_uv = np.stack((gradient_pts[1], gradient_pts[0]), axis=-1)
+    interpolated_pts = barycentric_interpolation(d_mesh, ft_uvd, interpolated_uv)
+    if verbose: print(f"Interpolated and returning {len(interpolated_pts)} points")
+    return interpolated_pts
 
 
 def plot_mesh(mesh, mesh_pts_3d, a=None, use_depth=True, cmap_=cm.jet, max_distance=MAX_DISTANCE):
@@ -314,40 +324,6 @@ def get_epipolar_cost_min(c):
 #
 # -----------------------------------------------------------------------------------------------------------------
 
-# def support_resampling(imgl, imgr, pts, sz_occ=32, census_window_size=10,
-#                        pts_per_occ=NUM_SUPPORT_PTS_PER_OCCUPANCY_GRID, verbose=False):
-#     to_sample = -np.ones((len(pts) * pts_per_occ, 3))
-#     c = 0
-#     w = census_window_size // 2
-#     occ = -1 * np.ones((sz_occ, sz_occ))
-#
-#     for i, [u, v, d] in enumerate(pts.round().astype(int)):
-#         key = imgl[v - w: v + w + 1, u - w: u + w + 1]
-#
-#         for x_i, x in enumerate(np.arange(u - sz_occ // 2, u + sz_occ // 2, dtype=int)):
-#             for y_i, y in enumerate(np.arange(v - sz_occ // 2, v + sz_occ // 2, dtype=int)):
-#                 l = x - w
-#                 r = x + w + 1
-#                 up = y - w
-#                 down = y + w + 1
-#                 check_window = imgr[up:down, l:r]
-#                 if key.shape != check_window.shape != (census_window_size, census_window_size):
-#                     if verbose:
-#                         print("Window sizes not equal")
-#                         print(check_window.shape, "!=", key.shape)
-#                     break
-#                 occ[y_i, x_i] = hamming(census(key), census(check_window))
-#             if key.shape != check_window.shape != (census_window_size, census_window_size):
-#                 break
-#
-#         grad = cv2.Sobel(occ, cv2.CV_64F, 1, 1)
-#         resample = np.unravel_index(np.argpartition(grad.flatten(), -pts_per_occ)[-pts_per_occ:], occ.shape)
-#
-#         to_sample[c:c + len(resample)] = np.array((u - (resample[1] - sz_occ // 2), v - (resample[0] - sz_occ // 2),
-#                                                    occ[resample])).T
-#         c += len(resample)
-#
-#     return to_sample
 
 def support_resampling(imgl, imgr, pts, sz_occ=32,  census_window_size=10,
                        pts_per_occ =  NUM_SUPPORT_PTS_PER_OCCUPANCY_GRID, verbose=False):
@@ -385,3 +361,93 @@ def support_resampling(imgl, imgr, pts, sz_occ=32,  census_window_size=10,
     return to_sample
 
 
+
+
+
+
+def calculate_costs(imgl, imgr, interpolated, ft_uvd, verbose=True):
+    print("Calculating costs")
+    new_census = np.abs(get_disparity_census_cost(interpolated, imgl, imgr, HuskyCalib.left_camera_matrix,HuskyCalib.t_cam0_velo, num_disparity_levels=5))
+
+    # MAX_COST = 0.8  # Hardcoded values
+    # MIN_COST = 0.2  # Hardcoded values
+
+    MAX_COST = new_census[:, new_census.shape[1] // 2].mean() \
+               - new_census[:, new_census.shape[1] // 2].std()  # Using shifting boundaries
+    MIN_COST = new_census.min(axis=1).mean() - new_census.min(axis=1).std()  # Statistically defined minimum
+    FT_COSTS = np.abs(get_disparity_census_cost(ft_uvd, imgl, imgl, HuskyCalib.left_camera_matrix,HuskyCalib.t_cam0_velo, num_disparity_levels=1)).mean()
+    if verbose: print("-----------------------------")
+    if verbose: print("Cost Calculation:")
+
+    if verbose: print(f"Mean {new_census.mean()}")
+    if verbose: print(f"Max {new_census.max()}")
+    if verbose: print(f"Min {new_census.min()}")
+
+    if verbose: print(f"Setting MAX_COST to {MAX_COST}")
+    if verbose: print(f"Setting MIN_COST to {MIN_COST}")
+    if verbose: print(f"Average cost from features for mesh construction was {FT_COSTS}")
+
+    min_cost_idx = new_census.min(axis=1) < MIN_COST
+
+    # Using the best match in the window at this point. It might not be right
+    # max_cost_idx = new_census.min(axis=1) > MAX_COST
+
+    # c_g = np.nan*np.ones((len(new_census), 4)) # (u,v,d,c)
+    c_g = -1 * np.ones((len(new_census), 4))  # (u,v,d,c)
+    c_b = c_g.copy()
+
+    # good points are those with the lowest cost
+    c_g = np.hstack((interpolated[min_cost_idx, :2],
+                     depth_to_disparity(interpolated[min_cost_idx, 2], HuskyCalib.left_camera_matrix, t).reshape((-1, 1)),
+                     new_census.min(axis=1)[min_cost_idx].reshape((-1, 1))))
+    # c_g_d_arg = np.argmin(new_census, axis=1)
+    # c_b_d_arg = np.argmax(new_census, axis=1)
+
+    # # Using the best match (new_census.min)
+    # c_b[max_cost_idx] = np.hstack((interpolated_pts[max_cost_idx, :2],
+    #                                depth_to_disparity(interpolated_pts[max_cost_idx, 2], HuskyCalib.left_camera_matrix t).reshape((-1, 1)),
+    #                                new_census.min(axis=1)[max_cost_idx].reshape((-1, 1))))
+
+    # Choosing bad points as compliment of good points
+    max_cost_idx = ~min_cost_idx
+    c_b = np.hstack((interpolated[max_cost_idx, :2],
+                     depth_to_disparity(interpolated[max_cost_idx, 2], HuskyCalib.left_camera_matrix, t).reshape((-1, 1)),
+                     new_census.min(axis=1)[max_cost_idx].reshape((-1, 1))))
+
+    if verbose: print(f"Total num census cost pts {len(new_census)}")
+    if verbose: print("Number of good interpolated points:", np.sum(np.sum(c_g, axis=1) != -c_g.shape[1]))
+    if verbose: print("Number of bad interpolated points:", np.sum(np.sum(c_b, axis=1) != -c_b.shape[1]))
+
+    return new_census, c_g, c_b
+
+
+
+
+
+# -----------------------------------------------------------------------------------------------------------------
+#       Resampling Iteratively
+# -----------------------------------------------------------------------------------------------------------------
+def resample_iterate(imgl, imgr, pts_resampling, eval_resampling_costs=False, verbose=True):
+    print("Support Resampling")
+    # pts_resampling = pts_to_still_resample[-num_resample:]
+    # pts_to_still_resample = pts_to_still_resample[:-num_resample]
+
+    support_pts = support_resampling(imgl, imgr, pts_resampling)
+    support_pts = support_pts[np.logical_and(np.logical_and(
+        np.all(support_pts > 0, axis=1), (support_pts[:, 0] < imgl.shape[1])), (support_pts[:, 1] < imgl.shape[0]))]
+
+    # -----------------------------------------------------------------------------------------------------------------
+    #       Adjusting depth for resampled points
+    # -----------------------------------------------------------------------------------------------------------------
+    # Searching for points along epipolar lines:
+    new_d = get_depth_with_epipolar(imgl, imgr, support_pts, K=HuskyCalib.left_camera_matrix, t=HuskyCalib.t_cam0_velo, F=None, use_epipolar_line=False)
+    resampled = np.stack((support_pts[:, 0], support_pts[:, 1], new_d), axis=-1)
+    resampled = resampled[resampled[:, 2] <= MAX_DISTANCE]
+
+    if eval_resampling_costs:
+        c_bf = get_disparity_census_cost(support_pts, imgl, imgr, HuskyCalib.left_camera_matrix, HuskyCalib.t_cam0_velo, num_disparity_levels=1).mean()
+        c_af = get_disparity_census_cost(resampled, imgl, imgr, HuskyCalib.left_camera_matrix, HuskyCalib.t_cam0_velo, num_disparity_levels=1).mean()
+        if verbose: print(f"Resampled {len(support_pts)} support points")
+        if verbose: print(f"Avg resampling cost before: {c_bf} \t after: {c_af}")
+
+    return resampled

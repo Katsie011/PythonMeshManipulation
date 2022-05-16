@@ -10,12 +10,7 @@ This is the pipeline implementation after experimenting with the concept in a ju
 # -----------------------------------------------------------------------------------------------------------------
 #       Importing libraries
 # -----------------------------------------------------------------------------------------------------------------
-import numpy as np
-import cv2
-import time
-import matplotlib.pyplot as plt
 import os
-import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.spatial import Delaunay
 import sys
@@ -26,7 +21,6 @@ sys.path.insert(0, "/ModularFiles")
 # import TriangleUtilityFunctions
 # import Kitti_Dataset_Files_Handler
 # import pykitti
-from HyperParameters import *
 
 # /home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/2011_09_26/2011_09_26_drive_0001_sync
 
@@ -52,7 +46,7 @@ import aru_py_mesh
 #       Extracting Features
 # -----------------------------------------------------------------------------------------------------------------
 
-def extract_fts(data, imgl, imgr, validate_pts=True, verbose=True):
+def extract_fts(imgl, imgr, validate_pts=True, verbose=True):
     print("Extracting features")
     if verbose: print("Have images of shape ", imgl.shape)
     if verbose: print("\t Expanding dimensions to ", np.expand_dims(imgl, -1).shape)
@@ -63,8 +57,13 @@ def extract_fts(data, imgl, imgr, validate_pts=True, verbose=True):
     if verbose: print("Extracting depth")
 
     if verbose: print("Getting sparse depth")
-    img_left = cv2.cvtColor(imgl, cv2.COLOR_GRAY2RGB)
-    img_right = cv2.cvtColor(imgr, cv2.COLOR_GRAY2RGB)
+    if len(imgl.shape)==2:
+        img_left = cv2.cvtColor(imgl, cv2.COLOR_GRAY2RGB)
+        img_right = cv2.cvtColor(imgr, cv2.COLOR_GRAY2RGB)
+    else:
+        img_left = imgl
+        img_right = imgr
+
     sparse_depth_img = depth_est.create_sparse_depth(img_left, img_right)
     # sparse_depth_img = np.abs(sparse_depth_img)
     # plt.imshow(cv2.dilate((sparse_depth_img>0).astype(np.uint8), np.ones((4,4))), 'gray')
@@ -81,16 +80,6 @@ def extract_fts(data, imgl, imgr, validate_pts=True, verbose=True):
     return ft_uvd
 
 
-def interpolate_pts(imgl, d_mesh, ft_uvd, verbose=False):
-    δ = cv2.Laplacian(imgl, cv2.CV_64F)
-    δ = np.abs(δ)
-
-    idx = np.argpartition(δ.flatten(), -INTERPOLATING_POINTS)[-INTERPOLATING_POINTS:]
-    gradient_pts = np.unravel_index(idx, imgl.shape)
-    interpolated_uv = np.stack((gradient_pts[1], gradient_pts[0]), axis=-1)
-    interpolated_pts = barycentric_interpolation(d_mesh, ft_uvd, interpolated_uv)
-    if verbose: print(f"Interpolated and returning {len(interpolated_pts)} points")
-    return interpolated_pts
 
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -220,7 +209,7 @@ def iterative_recon(img_l, img_r, num_iterations=RESAMPLING_ITERATIONS, num_pts_
     # --------------------------------------
     #       Getting feature depth
     # --------------------------------------
-    ft_uvd = extract_fts(data, img_l, img_r)
+    ft_uvd = extract_fts(img_l, img_r)
     # Building mesh
     depth_mesh = Delaunay(ft_uvd[:, :2])
     depth_mesh_pts = ft_uvd.copy()
@@ -350,8 +339,7 @@ def iterative_recon(img_l, img_r, num_iterations=RESAMPLING_ITERATIONS, num_pts_
 
 
 if __name__ == "__main__":
-    import ErrorEvaluation
-
+    import pykitti
     print("Loading database")
     base = r"/home/kats/Datasets/KITTI_cvlibs/"
     date = "2011_09_26"

@@ -10,29 +10,16 @@ This is the pipeline implementation after experimenting with the concept in a ju
 # -----------------------------------------------------------------------------------------------------------------
 #       Importing libraries
 # -----------------------------------------------------------------------------------------------------------------
-import numpy as np
-import cv2
-import time
-import matplotlib.pyplot as plt
-import os
-import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.spatial import Delaunay
-from scipy.spatial.distance import hamming
-from sklearn.preprocessing import normalize
-from scipy.spatial import ConvexHull
-import time
-from matplotlib import cm
 # import aru_py_mesh
 import sys
 
 sys.path.insert(0, "/ModularFiles")
 # import DatasetHandler
 import ImgFeatureExtactorModule as ft
-import TriangleUtilityFunctions
 # import Kitti_Dataset_Files_Handler
-import pykitti
-from HyperParameters import *
+from PythonMeshManipulation.mesh_pydnet.HyperParameters import *
 
 # /home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/2011_09_26/2011_09_26_drive_0001_sync
 base = r"/home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/"
