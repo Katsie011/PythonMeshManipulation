@@ -14,26 +14,19 @@ import os
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.spatial import Delaunay
 import sys
-
-sys.path.insert(0, "/ModularFiles")
-# import DatasetHandler
-# import ImgFeatureExtactorModule as ft
-# import TriangleUtilityFunctions
-# import Kitti_Dataset_Files_Handler
-# import pykitti
-
-# /home/kats/Documents/My Documents/Datasets/KITTI_cvlibs/2011_09_26/2011_09_26_drive_0001_sync
+import numpy as np
+import matplotlib.pyplot as plt
+import cv2
 
 
-from Functions_TunableReconstruction import *
 
-# fig, ax = plt.subplots(1,2)
-# ax[0].imshow(np.array(data.get_cam0(0)))
-# ax[1].imshow(np.array(data.get_cam1(0)))
-#
-# ax[0].set_title("Test Left Img")
-# ax[1].set_title("Test Right Img")
-# plt.show()
+
+# You may need to change this to wherever the mapping repo is
+sys.path.insert(0, "/home/kats/Code/PythonMeshManipulation/")
+from mesh_pydnet.HyperParameters import *
+import Functions_TunableReconstruction as TR_func
+
+sys.path.insert(0, "/home/kats/Code/ModularFiles")
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Declaring Hyperparameters
@@ -336,6 +329,91 @@ def iterative_recon(img_l, img_r, num_iterations=RESAMPLING_ITERATIONS, num_pts_
         plt.show()
 
     return depth_mesh, depth_mesh_pts
+
+
+def depth_img_ITR(img, depth_pred, ):
+    mesh_pts = TR_func.get_depth_pts(det, imgl, depth)
+    depth_mesh = Delaunay(mesh_pts[:, :2])
+    u, v, d = mesh_pts.T
+
+    # ----------------------------------------------------
+    #     Interpolating
+    # ----------------------------------------------------
+
+    to_resample = TR_func.interpolate_pts(imgl, depth_mesh, mesh_pts, verbose=verbose)
+
+    # ----------------------------------------------------
+    #       Cost Calculation
+    # ----------------------------------------------------
+
+    c_interpolated, good_c_pts, bad_c_pts = TR_func.calculate_costs(imgl, imgr, to_resample,
+                                                                    mesh_pts, verbose=verbose)
+
+    idx = np.argsort(bad_c_pts[:, -1])[::-1]
+    num_pts_per_resample = 25
+    eval_resampling_costs = False
+    resampling_pts = bad_c_pts[idx[:num_pts_per_resample], :3]
+    still_to_resample = bad_c_pts[idx[num_pts_per_resample:]]
+    # cost_bad_pts = n x [u, v, d, c]
+    resampled_pts = TR_func.resample_iterate(imgl, imgr, resampling_pts,
+                                             eval_resampling_costs=eval_resampling_costs,
+                                             verbose=verbose)
+
+    new_mesh_pts = np.vstack((mesh_pts, good_c_pts[:, :3], resampled_pts))
+    new_mesh_pts = new_mesh_pts[new_mesh_pts[:, 2] < MAX_DISTANCE]
+    new_mesh = Delaunay(new_mesh_pts[:, :2])  # .filled())
+
+    # Now need to show a comparison before and after resampling
+    it_stop = time.time()
+
+    dpi = 40
+    # figsize = 2*height / float(dpi), 2*width / float(dpi)
+    figsize = width / float(dpi), height / float(dpi)
+    fig, ax = plt.subplots(2, 3, figsize=figsize)  # , dpi=dpi)
+    fig.tight_layout(pad=2)
+
+    disp_im = ax[0, 0].imshow(disp[0, :, :, 0].squeeze(), 'jet')
+    ax[0, 0].set_title(f"Disparity img frame {counter}")
+    divider = make_axes_locatable(ax[0, 0])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(disp_im, cax=cax, orientation='vertical')
+
+    depth_im = ax[0, 1].imshow(depth, 'jet')
+    ax[0, 1].set_title(f"Bounded depth img frame {counter}")
+    divider = make_axes_locatable(ax[0, 1])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(depth_im, cax=cax, orientation='vertical')
+
+    ax[0, 2].hist(depth.flatten(), bins=100)
+    ax[0, 2].set_title("Histogram of depth predictions")
+
+    ax[1, 0].imshow(imgl)
+    sc = ax[1, 0].scatter(u, v, c=d, s=10, cmap='jet')
+    ax[1, 0].set_title(f"Scattered pts before Tunable Recon - Frame {counter}")
+    divider = make_axes_locatable(ax[1, 0])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(sc, cax=cax, orientation='vertical')
+
+    ax[1, 1].imshow(imgl)
+    u2, v2, d2 = new_mesh_pts.T
+    sc1 = ax[1, 1].scatter(u2, v2, c=d2, s=10, cmap='jet')
+    ax[1, 1].set_title(f"Scattered pts after Tunable Recon - Frame {counter}")
+    divider = make_axes_locatable(ax[1, 1])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(sc1, cax=cax, orientation='vertical')
+
+    ax[1, 2].hist(new_mesh_pts[:, 2], bins=100)
+    ax[1, 2].set_title("Histogram after tunable reconstruction")
+
+    for axes in ax[:2, :2]:
+        for a in axes:
+            a.axis('off')
+
+    # plt.show()
+    fig.canvas.draw()
+    plot = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8,
+                         sep='')
+    plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 
 
 if __name__ == "__main__":

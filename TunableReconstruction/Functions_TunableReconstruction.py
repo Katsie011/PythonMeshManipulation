@@ -3,10 +3,12 @@
 # -----------------------------------------------------------------------------------------------------------------
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import sys
 # from scipy.spatial import Delaunay
 from scipy.spatial.distance import hamming
-from PythonMeshManipulation.mesh_pydnet.HyperParameters import *
 
+sys.path.insert(0, "/home/kats/Code/PythonMeshManipulation/")
+from mesh_pydnet.HyperParameters import *
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Feature Extraction
@@ -20,6 +22,13 @@ def keyPoint_to_UV(kps):
 
     return uv
 
+def get_depth_pts(det, img, depth):
+    u, v = keyPoint_to_UV(det.detect(img)).T
+    u_d = np.round(u * depth.shape[1] / img.shape[1]).astype(int)
+    v_d = np.round(v * depth.shape[0] / img.shape[0]).astype(int)
+    d = depth[v_d, u_d]
+
+    return np.stack((u, v, d), axis=-1)
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Stereo Depth

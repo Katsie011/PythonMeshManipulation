@@ -7,33 +7,35 @@ import tqdm
 
 
 def make_train_test_lists(data_dir, test_dir, training_dir, make_test=True, make_train=True, train_test_ratio=10,
-                          make_time_files=False):
+                          make_training_list_files=False, include_lidar=True):
     print("Folders found:", os.listdir(data_dir))
     dir, folders, files = next(os.walk(data_dir))
 
     c = 0
     # I have no cooking clue why but as soon as you check or make folders this all breaks and you can't access the folders.
-    """
-    if not os.path.exists(os.path.join(test_dir, 'image_00/data')):
-        os.makedirs(os.path.join(test_dir, 'image_00/data'))
-    if not os.path.exists(os.path.join(test_dir, 'image_01/data')):
-        os.makedirs(os.path.join(test_dir, 'image_01/data'))
-    if not os.path.exists(os.path.join(test_dir, 'velodyne_points/data')):
-        os.makedirs(os.path.join(test_dir, 'velodyne_points/data'))
+    # """
+    # if not os.path.exists(os.path.join(test_dir, 'image_00/data')):
+    #     os.makedirs(os.path.join(test_dir, 'image_00/data'))
+    # if not os.path.exists(os.path.join(test_dir, 'image_01/data')):
+    #     os.makedirs(os.path.join(test_dir, 'image_01/data'))
+    # if not os.path.exists(os.path.join(test_dir, 'velodyne_points/data')):
+    #     os.makedirs(os.path.join(test_dir, 'velodyne_points/data'))
+    #
+    # if not os.path.exists(os.path.join(training_dir, 'image_00/data')):
+    #     os.makedirs(os.path.join(training_dir, 'image_00/data'))
+    # if not os.path.exists(os.path.join(training_dir, 'image_01/data')):
+    #     os.makedirs(os.path.join(training_dir, 'image_01/data'))
+    # if not os.path.exists(os.path.join(training_dir, 'velodyne_points/data')):
+    #     os.makedirs(os.path.join(training_dir, 'velodyne_points/data'))
+    # """
 
-    if not os.path.exists(os.path.join(training_dir, 'image_00/data')):
-        os.makedirs(os.path.join(training_dir, 'image_00/data'))
-    if not os.path.exists(os.path.join(training_dir, 'image_01/data')):
-        os.makedirs(os.path.join(training_dir, 'image_01/data'))
-    if not os.path.exists(os.path.join(training_dir, 'velodyne_points/data')):
-        os.makedirs(os.path.join(training_dir, 'velodyne_points/data'))
-    """
-
-    if make_time_files:
+    if make_training_list_files:
         test_file = open(os.path.join(test_dir, "test_file_list.txt"), 'w')
         train_file = open(os.path.join(training_dir, 'training_file_list.txt'), 'w')
 
-    for f in folders:
+    for fnum, f in enumerate(folders):
+        print(f"\nOn folder number {fnum} of {len(folders)}\n"
+              f"--------------------------------------------------------")
         husky_data = husky.Dataset_Handler(data_path=os.path.join(data_dir, f))
         print(f"Number of time synced frames is: {husky_data.num_frames}")
         flag_train = True
@@ -55,7 +57,7 @@ def make_train_test_lists(data_dir, test_dir, training_dir, make_test=True, make
 
                     cv2.imwrite(im_left_path, im_left)
                     cv2.imwrite(im_right_path, im_right)
-                    if velo_flag:
+                    if velo_flag & include_lidar:
                         velo_path = os.path.join(test_dir, 'velodyne_points/data', husky_data.lidar_files[i])
                         np.save(velo_path, velo)
 
@@ -66,8 +68,8 @@ def make_train_test_lists(data_dir, test_dir, training_dir, make_test=True, make
                         print(f"Test File Format:\n\t{test_line}", f"\n\timage_01/data{right}",
                               f'velodyne_points/data{husky_data.lidar_files[i]}')
                         flag_test = False
-                    # if make_time_files:
-                    #     test_file.write(test_line)
+                    if make_training_list_files:
+                        test_file.write(test_line)
 
             if make_train:
                 im_left = np.array(husky_data.get_cam0(i))
@@ -82,12 +84,13 @@ def make_train_test_lists(data_dir, test_dir, training_dir, make_test=True, make
                 cv2.imwrite(im_right_path, im_right)
 
                 train_line = f"image_00/data/{left} image_01/data/{right}\n"
-                if make_time_files:
+                if make_training_list_files:
                     train_file.write(train_line)
 
-                if velo_flag:
+                if velo_flag & include_lidar:
                     velo_path = os.path.join(training_dir, 'velodyne_points/data', husky_data.lidar_files[i])
                     np.save(velo_path, velo)
+
                 if flag_train:
                     print(f"Train File Format:\n{train_line}")
                     flag_train = False
@@ -98,11 +101,11 @@ def make_train_test_lists(data_dir, test_dir, training_dir, make_test=True, make
 
 
 if __name__ == '__main__':
-    data_dir = r"/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route C"
-    training_dir = "/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Route_C"
-    test_dir = "/media/kats/Katsoulis3/Datasets/Husky/Testing Data/Test_Route_C"
+    data_dir = r"/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/"
+    training_dir = r"/media/kats/Katsoulis3/Datasets/Husky/Training Data/old_zoo"
+    test_dir = r"/media/kats/Katsoulis3/Datasets/Husky/Testing Data/old_zoo"
 
     train_test_ratio = 10
 
-    make_train_test_lists(data_dir=data_dir, test_dir=test_dir, training_dir=training_dir, make_train=False,
-                          train_test_ratio=train_test_ratio, make_time_files=False)
+    make_train_test_lists(data_dir=data_dir, test_dir=test_dir, training_dir=training_dir, make_train=True,
+                          train_test_ratio=train_test_ratio, make_training_list_files=True)

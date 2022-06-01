@@ -24,9 +24,9 @@ import sys
 import numpy as np
 
 from PythonMeshManipulation.mesh_pydnet.HyperParameters import *
-# from PythonMeshManipulation.mesh_pydnet.TunableReconstruction.Functions_TunableReconstruction import *
+import PythonMeshManipulation.mesh_pydnet.TunableReconstruction.Functions_TunableReconstruction as TR_func
 import ModularFiles.HuskyDataHandler as husky
-import IterativeTunableReconstructionPipeline as ITR
+import PythonMeshManipulation.mesh_pydnet.TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
 
 # ----------------------------------------------------------------------------
 
@@ -104,9 +104,9 @@ def render_lidar(pts, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_matrix
 
 
 def quantify_img_error_lidar(predicted_img,
-                             ground_truth_3d, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_matrix,
-                             gt_is_sparse_img=False, use_MSE=True,
-                             generate_plots=False, normalise_by_test_pts=True):
+                             ground_truth_3d, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_matrix, baseline=None,
+                             convert_to_disp=False, gt_is_sparse_img=False, use_MSE=True,
+                             generate_plots=False, normalise_by_test_pts=True, ):
     r"""
     Input a predicted depth image and Ground truth
         - Ground truth can be sparse image or lidar points
@@ -127,6 +127,10 @@ def quantify_img_error_lidar(predicted_img,
                 dense_depth = make_sparse_dense(ground_truth_3d)
     else:
         dense_depth = make_sparse_dense(render_lidar(ground_truth_3d, Tr=Tr, K=K, render_shape=predicted_img.shape))
+
+    if convert_to_disp:
+        predicted_img = TR_func.disparity_to_depth(predicted_img, K=K, t=baseline)
+        dense_depth = TR_func.disparity_to_depth(dense_depth, K=K, t=baseline)
 
     e_im = (dense_depth - predicted_img) ** 2
 
@@ -160,6 +164,41 @@ def error_heatmap(predicted_img, ground_truth_3d, Tr=HuskyCalib.T_cam0_vel0, K=H
 
     return colourmap(emap)
 
+
+def pt_to_pt_emap(predicted_img, gt_cam_pts, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_matrix,
+                  gt_is_sparse_img=False, normalise_by_mean=True, mask=False, colourmap=cm.get_cmap('jet'),
+                  img_shape=IMAGE_SHAPE, dilation=10):
+    r"""
+    Returns Heat map of error but only at the sample pts
+    """
+
+    idx, idy = np.floor(gt_cam_pts.T[:2]).astype(int)
+    if (predicted_img.shape[0] < img_shape[0]) or (predicted_img.shape[1] < img_shape[1]):
+        predicted_img = cv2.resize(predicted_img, img_shape[:2][::-1])
+
+    if colourmap is None:
+        emap = np.zeros((predicted_img.shape[0], predicted_img.shape[1]))
+    else:
+        emap = np.zeros((predicted_img.shape[0], predicted_img.shape[1], 4))
+    es = ((predicted_img[idy, idx] - gt_cam_pts[:, 2]) ** 2)
+
+    if normalise_by_mean:
+        es = es / es.mean()
+
+    if colourmap is None:
+        emap[idy, idx] = es
+    else:
+        emap[idy, idx] = colourmap(es)
+
+    emap = cv2.dilate(emap, np.ones((dilation, dilation)))
+
+    if mask:
+        emap = np.ma.masked_where(emap == 0, emap)
+        return emap
+
+    return emap
+
+
 def get_pt_to_pt_error(sample_pts, gt_pts, use_MSE=True):
     e_im = (sample_pts - gt_pts) ** 2
     if use_MSE:
@@ -169,8 +208,8 @@ def get_pt_to_pt_error(sample_pts, gt_pts, use_MSE=True):
 
     return e
 
-def get_img_pt_to_pt_error(depth_im, uv, d, normalise_by_mean=False, img_shape=IMAGE_SHAPE, use_MSE=True):
 
+def get_img_pt_to_pt_error(depth_im, uv, d, normalise_by_mean=False, img_shape=IMAGE_SHAPE, use_MSE=True):
     u, v = np.floor(uv).astype(int).T
     render_u = np.floor(u * depth_im.shape[1] / img_shape[1]).astype(int)
     render_v = np.floor(v * depth_im.shape[0] / img_shape[0]).astype(int)
@@ -179,14 +218,14 @@ def get_img_pt_to_pt_error(depth_im, uv, d, normalise_by_mean=False, img_shape=I
     return get_pt_to_pt_error(sampled_pts, d, use_MSE=use_MSE)
 
 
-def get_iterative_TR_error(imgl, imgr, lidar, use_MSE = True):
+def get_iterative_TR_error(imgl, imgr, lidar, use_MSE=True):
     mesh, pts = ITR.iterative_recon(img_l=imgl, img_r=imgr, num_iterations=RESAMPLING_ITERATIONS,
                                     num_pts_per_resample=25, eval_resampling_costs=False, frame=None,
                                     before_after_plots=False, plot_its=False, save_fig_path=None, verbose=False)
 
-    uv = pts[:,:2]
-    d = pts[:,2]
-    e = get_img_pt_to_pt_error(render_lidar(lidar,img_shape=imgl.shape),uv=uv, d=d , use_MSE=use_MSE)
+    uv = pts[:, :2]
+    d = pts[:, 2]
+    e = get_img_pt_to_pt_error(render_lidar(lidar, img_shape=imgl.shape), uv=uv, d=d, use_MSE=use_MSE)
     return e
 
 
@@ -271,51 +310,74 @@ if __name__ == "__main__":
         # img = cv2.cvtColor(dataset.get_cam0(frame), cv2.COLOR_BRG2RGB)
         img = dataset.get_cam0(frame)
 
-        u, v, gt_d = lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.left_camera_matrix, img_shape=img.shape)
-        velo_cam = np.floor(np.stack((u, v, gt_d), axis=1)).astype(int)
+        u, v, gt_depth = lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.left_camera_matrix,
+                                            img_shape=img.shape)
+        gt_disparity = TR_func.depth_to_disparity(gt_depth, dataset.left_camera_matrix, dataset.baseline)
+        velo_cam = np.floor(np.stack((u, v, gt_disparity), axis=1)).astype(int)
 
         pred = cv2.imread(os.path.join(out_save_dir, predictions[i]), cv2.IMREAD_GRAYSCALE)
+        pred = TR_func.depth_to_disparity(pred, dataset.left_camera_matrix, dataset.baseline)
         pred = np.ma.array(pred, mask=(pred == 0), fill_value=1e-3, dtype=np.float32)
 
-        img_errors[i] = quantify_img_error_lidar(pred, velo_cam)
-        MSE_errors[i] = get_img_pt_to_pt_error(pred, velo_cam[:,:2], d=gt_d)
-        SSE_errors[i] = get_img_pt_to_pt_error(pred, velo_cam[:,:2], d=gt_d)
+        print(pred.max())
+        # Are the errors actually correct?
+        # What is the range in disparities?
 
-        itr_errors[i] = get_iterative_TR_error(dataset.get_cam0(frame), dataset.get_cam1(frame), velo_cam[::20])
+        img_errors[i] = quantify_img_error_lidar(pred, velo_cam)
+        MSE_errors[i] = get_img_pt_to_pt_error(pred, velo_cam[:, :2], d=gt_disparity)
+        SSE_errors[i] = get_img_pt_to_pt_error(pred, velo_cam[:, :2], d=gt_disparity)
+
+        # itr_errors[i] = get_iterative_TR_error(dataset.get_cam0(frame), dataset.get_cam1(frame), velo_cam[::20])
 
         if plotflag:
 
             print("Generating Plots")
             fig, ax = plt.subplots(2, 2, figsize=(10, 8))
-            fig.tight_layout(pad=2)
+            fig.tight_layout(pad=3)
             for row in ax:
                 for a in row:
                     a.axis('off')
 
             ax[1, 0].imshow(dataset.get_cam0(frame))
-            im = ax[1, 0].scatter(u, v, c=gt_d, cmap='jet', s=3)
+            im = ax[1, 0].scatter(u, v, c=gt_disparity, cmap='jet', s=3)
             divider = make_axes_locatable(ax[1, 0])
             cax = divider.append_axes("right", size="5%", pad=0.05)
-            plt.colorbar(im, cax=cax)
-            ax[1, 0].set_title("Lidar Image")
+            cb = plt.colorbar(im, cax=cax)
+            cb.set_label("Disparity")
+            ax[1, 0].set_title("Lidar Image in disparity")
 
-            im = ax[1, 1].imshow(pred, 'jet')
-            divider = make_axes_locatable(ax[1, 1])
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            plt.colorbar(im, cax=cax)
-            ax[1, 1].set_title("Predicted output")
-
-            im = ax[0, 1].imshow(error_heatmap(pred, velo_cam[::20]))
+            im = ax[0, 1].imshow(pred, 'jet')
             divider = make_axes_locatable(ax[0, 1])
             cax = divider.append_axes("right", size="5%", pad=0.05)
-            plt.colorbar(im, cax=cax)
-            ax[0, 1].set_title("Error Map")
+            cb = plt.colorbar(im, cax=cax)
+            cb.set_label("Disparity")
+            ax[0, 1].set_title("Predicted output")
+
+            # im = ax[1, 1].imshow(error_heatmap(pred, velo_cam[::20]))
+            im = ax[1, 1].imshow(pt_to_pt_emap(pred, velo_cam, mask=True, colourmap=None), 'jet')
+            divider = make_axes_locatable(ax[1, 1])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cb = plt.colorbar(im, cax=cax)
+            cb.set_label("Disparity")
+            ax[1, 1].set_title(f"Error Map. MSE:{MSE_errors[i]:.2f}")
 
             ax[0, 0].imshow(dataset.get_cam0(frame))
             ax[0, 0].set_title("Query img")
             fig.suptitle(f"Output and Error for frame {frame}")
-            plt.show()
-            plotflag = False
+
+            # plt.show()
+            # plotflag = False
+
+            fig.canvas.draw()
+            canvas = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8,
+                                   sep='')
+            canvas = canvas.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            # img is rgb, convert to opencv's default bgr
+            canvas = cv2.cvtColor(canvas, cv2.COLOR_RGB2BGR)
+            cv2.imshow('output', canvas)
+            cv2.waitKey(40)
+
+    plt.show()
 
     plt.plot(frame_nums, img_errors)
     plt.title("Mean Squared Errors over frames")
@@ -338,4 +400,3 @@ if __name__ == "__main__":
           f"\t\t- PyDepth Mean MSE {np.mean(img_errors):.2f}\n"
           f"\t\t- Iterative Reconstruction @(3 resamle iterations and 25pts) Mean MSE:{np.mean(itr_errors):.2f}\n"
           f"")
-
