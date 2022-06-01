@@ -6,9 +6,9 @@ from matplotlib import cm
 import sys
 # from scipy.spatial import Delaunay
 from scipy.spatial.distance import hamming
-
-sys.path.insert(0, "/home/kats/Code/PythonMeshManipulation/")
 from mesh_pydnet.HyperParameters import *
+
+
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Feature Extraction

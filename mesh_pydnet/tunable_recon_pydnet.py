@@ -1,41 +1,24 @@
-import numpy as np
-import cv2
 import time
+
+import numpy as np
+import tqdm
 import matplotlib.pyplot as plt
-import os
-import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import os
 from scipy.spatial import Delaunay
-import sys
-
-# from TunableReconstruction import IterativeTunableReconstructionPipeline
-
-import ModularFiles.HuskyDataHandler as husky
-import shutil
-
 import tensorflow as tf
 # import tensorflow.compat.v1 as tf
 import argparse
 
-from HyperParameters import *
-from TunableReconstruction.ErrorEvaluation import *
-from TunableReconstruction.Functions_TunableReconstruction import *
-# from TunableReconstruction.IterativeTunableReconstructionPipeline import *
+from mesh_pydnet.HyperParameters import *
+import TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
+import TunableReconstruction.Functions_TunableReconstruction as TR_func
 import ModularFiles.ImgFeatureExtactorModule as feat
 import ModularFiles.HuskyDataHandler as husky
+import TunableReconstruction.ErrorEvaluationImgs as ee
 
-sys.path.insert(0, "./pydnet/")
-from utils import *
-from pydnet import *
-
-# data_dir = r"/media/kats/Katsoulis3/Datasets/Husky/extracted_data/"
-# training_dir = "/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train1"
-# test_dir = "/media/kats/Katsoulis3/Datasets/Husky/Testing Data/Test1"
-# # test_dir = "/media/kats/Katsoulis3/Datasets/Husky/Training Data/TestKitti"
-# test_filenames = os.path.join(test_dir, "test_file_list.txt")
-# train_filenames = os.path.join(training_dir, 'training_file_list.txt')
-# output_directory = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Test_Husky5000/'
-# checkpoint_dir = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train1/tmp/Husky5000/Husky'
+from pydnet.utils import *
+from pydnet.pydnet import *
 
 data_dir = r"/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route C"
 training_dir = "/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Route_C"
@@ -45,11 +28,6 @@ train_filenames = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Rou
 output_directory = os.path.join(test_dir, 'predictions')
 # checkpoint_dir = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train1/tmp/Husky5000/Husky'
 checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/pydnet/checkpoint/Husky5000/Husky'
-"""
- python experiments.py --datapath /media/kats/Katsoulis3/Datasets/Husky/Training\ Data/Test1/ \
- --filenames "/media/kats/Katsoulis3/Datasets/Husky/Training Data/Test1/test_file_list.txt" \
- --output_directory /media/kats/Katsoulis3/Datasets/Husky/Training\ Data/Test_Husky5000/
-"""
 
 parser = argparse.ArgumentParser(description='Argument parser')
 
@@ -102,42 +80,138 @@ def get_dataset():
 
         return husky.Dataset_Handler(test_dir)
 
-    elif args.dataset.lower() == 'kitti':
-        print("Overriding and using Kitti Data")
-        files = pd.DataFrame(data=np.array((data.cam2_files, data.cam3_files)).reshape((-1, 2)),
-                             columns=['left', 'right'])
-        files = files.sample(100).reset_index()
-
-    else:
-        raise "Invalid argument for dataset"
-    return files
-
-
-# def interpolate_pts(imgl, d_mesh, ft_uvd, verbose=False):
-#     δ = cv2.Laplacian(imgl, cv2.CV_64F)
-#     δ = np.abs(δ)
-#
-#     idx = np.argpartition(δ.flatten(), -INTERPOLATING_POINTS)[-INTERPOLATING_POINTS:]
-#     gradient_pts = np.unravel_index(idx, imgl.shape)
-#     interpolated_uv = np.stack((gradient_pts[1], gradient_pts[0]), axis=-1)
-#     interpolated_pts = barycentric_interpolation(d_mesh, ft_uvd, interpolated_uv)
-#     if verbose: print(f"Interpolated and returning {len(interpolated_pts)} points")
-#     return interpolated_pts
+    # elif args.dataset.lower() == 'kitti':
+    #     print("Overriding and using Kitti Data")
+    #     files = pd.DataFrame(data=np.array((data.cam2_files, data.cam3_files)).reshape((-1, 2)),
+    #                          columns=['left', 'right'])
+    #     files = files.sample(100).reset_index()
+    #
+    # else:
+    #     raise "Invalid argument for dataset"
+    # return files
 
 
-def get_depth_pts(det, img, depth):
-    u, v = keyPoint_to_UV(det.detect(img)).T
-    u_d = np.round(u * depth.shape[1] / img.shape[1]).astype(int)
-    v_d = np.round(v * depth.shape[0] / img.shape[0]).astype(int)
-    d = depth[v_d, u_d]
+def init_pydepth():
+    placeholders = {'im0': tf.compat.v1.placeholder(tf.float32, [None, None, None, 3], name='im0')}
 
-    return np.stack((u, v, d), axis=-1)
+    with tf.compat.v1.variable_scope("model") as scope:
+        # pydnet might look like an error but it depends on if your IDE can load the module from a sys include
+        model = pydnet(placeholders)
+
+    init = tf.group(tf.compat.v1.global_variables_initializer(),
+                    tf.compat.v1.local_variables_initializer())
+
+    loader = tf.compat.v1.train.Saver()
+    saver = tf.compat.v1.train.Saver()
+
+    return placeholders, model, init, loader, saver
 
 
-def tunable_recon():
+def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plot=False):
+    """
+    Gets the error of the prediction compared to the lidar as well as the pt-to-pt error for the points provided
+
+    If plot == true:
+        makes a plot of the errors and displays
+    """
+    query_im = dataset.get_cam0(frame)
+    velo = dataset.get_lidar(frame)
+    u, v, gt_depth = ee.lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.calib.cam0_camera_matrix,
+                                           img_shape=query_im.shape)
+    gt_disparity = TR_func.depth_to_disparity(gt_depth, dataset.calib.cam0_camera_matrix, dataset.calib.baseline)
+    velo_cam = np.floor(np.stack((u, v, gt_disparity), axis=1)).astype(int)
+
+    pred_e = ee.quantify_img_error_lidar(pred_disp_img, velo_cam)
+
+    errors = np.zeros(len(pt_list))
+    if plot:
+        # if make plot of pts:
+        cols = 2
+        rows = len(pt_list)+1
+        fig, ax = plt.subplots(rows, cols, figsize=(6 * cols, 3 * rows))
+        fig.tight_layout(pad=2)
+
+        ax[0, 0].imshow(query_im)
+        ax[0, 0].set_title(f"Query image for frame {frame}")
+        ax[0, 0].axis('off')
+
+        im = ax[0, 1].imshow(pred_disp_img, 'jet')
+        ax[0, 1].set_title("Predicted Disparity")
+        divider = make_axes_locatable(ax[0, 1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cb = plt.colorbar(im, cax=cax)
+        cb.set_label("Disparity")
+        ax[0, 1].axis('off')
+
+    # make lidar into ground truth image
+    gt_im = ee.rough_lidar_render(velo_cam)
+
+    for i, pts in enumerate(pt_list):
+        # get predicted depth for each point from the pts
+        # u, v, samples = ee.sample_img(pred_disp_img, pts[:, :2])
+        u, v, samples = pts.T
+        # Calculate error w.r.t. lidar gt img
+        err = ee.get_img_pt_to_pt_error(gt_im, np.stack((u, v), axis=1), samples,
+                                        img_shape=query_im.shape, use_MSE=True)
+
+        # append to errors list
+        errors[i] = err
+
+        if plot:
+            print(f"Using axis: [{1 // cols}, {i % cols}]")
+            a = ax[1 + i, 0]
+            a.axis('off')
+            a.imshow(query_im)
+            # Make Mesh
+            mesh = Delaunay(pts[:, :2])
+
+            # Triplot of mesh
+            # TODO
+
+            # color scattered points by their error
+            sc = a.scatter(u, v, c=samples, s=5, cmap='jet')
+            divider = make_axes_locatable(a)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cb = plt.colorbar(sc, cax=cax)
+            cb.set_label("Disparity")
+            a.set_title(title_list[i] + f" - MSE: {err:.1f} and with {len(pt_list[i])} pts")
+
+            b = ax[1 + i, 1]
+            b.axis('off')
+
+            u, v, gt_depth = ee.lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.calib.cam0_camera_matrix,
+                                                img_shape=query_im.shape)
+            gt_disparity = TR_func.depth_to_disparity(gt_depth, dataset.calib.cam0_camera_matrix, dataset.calib.baseline)
+            velo_cam = np.floor(np.stack((u, v, gt_disparity), axis=1)).astype(int)
+            im = b.imshow(ee.pt_to_pt_emap(predicted_img=pred_disp_img, gt_cam_pts=velo_cam, mask=True,
+                                                  colourmap=None), 'jet')
+            divider = make_axes_locatable(b)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cb = plt.colorbar(im, cax=cax)
+            cb.set_label("Disparity MSE")
+            b.set_title(f"Error Map. MSE:{errors[i]:.2f}")
+
+
+    if plot:
+        fig.canvas.draw()
+        plot = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8,
+                             sep='')
+        plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+        return errors, plot
+
+    return errors
+
+
+def tunable_recon(save_fig=False, verbose=False):
     dataset = get_dataset()
 
-    det = feat.FeatureDetector(det_type='sift', max_num_ft=MAX_NUM_FEATURES_DETECT)
+    sift = feat.FeatureDetector(det_type='sift', max_num_ft=MAX_NUM_FEATURES_DETECT)
+    orb = feat.FeatureDetector(det_type='orb', max_num_ft=MAX_NUM_FEATURES_DETECT)
+    # surf = feat.FeatureDetector(det_type='surf', max_num_ft=MAX_NUM_FEATURES_DETECT)
+
+    e_sift = []
+    e_orb = []
 
     # Writing out images
     out_save_dir = os.path.join(args.output_directory, "output", 'image_00', 'data')
@@ -148,34 +222,22 @@ def tunable_recon():
     if not os.path.isdir(query_save_dir):
         os.makedirs(query_save_dir)
 
-    # uv = keyPoint_to_UV(det.detect(img))
-
     with tf.Graph().as_default():
         height = args.height
         width = args.width
-        placeholders = {'im0': tf.compat.v1.placeholder(tf.float32, [None, None, None, 3], name='im0')}
-
-        with tf.compat.v1.variable_scope("model") as scope:
-            model = pydnet(placeholders)
-
-        init = tf.group(tf.compat.v1.global_variables_initializer(),
-                        tf.compat.v1.local_variables_initializer())
-
-        loader = tf.compat.v1.train.Saver()
-        saver = tf.compat.v1.train.Saver()
-
+        placeholders, model, init, loader, saver = init_pydepth()
         show_flag = True
 
         with tf.compat.v1.Session() as sess:
             sess.run(init)
             loader.restore(sess, args.checkpoint_dir)
 
-            counter = 0
-            for counter in range(dataset.num_frames):
-                imgl_fname = dataset.left_image_files[counter]
-                imgr_fname = dataset.right_image_files[counter]
-                imgl = cv2.cvtColor(dataset.get_cam0(counter), cv2.COLOR_BGR2RGB)
-                imgr = cv2.cvtColor(dataset.get_cam1(counter), cv2.COLOR_BGR2RGB)
+            for counter in tqdm.trange(dataset.num_frames):
+                imgl_fname = dataset.get_cam0(counter)
+                imgr_fname = dataset.get_cam1(counter)
+                velo_fname = dataset.get_lidar(counter)
+                imgl = dataset.get_cam0(counter)
+                imgr = dataset.get_cam1(counter)
 
                 img = cv2.resize(imgl, (width, height)).astype(np.float32) / 255.
                 img = np.expand_dims(img, 0)
@@ -186,114 +248,70 @@ def tunable_recon():
                 time_pred = start_pred - end_pred
 
                 disparity = disp[0, :, :, 0].squeeze() * 0.3 * width
-                # depth = disparity_to_depth(np.round(disparity).astype(int), K, t)
 
-                depth = disparity_to_depth(disparity, HuskyCalib.left_camera_matrix, HuskyCalib.t_cam0_velo)
+                depth = TR_func.disparity_to_depth(disparity, HuskyCalib.left_camera_matrix, HuskyCalib.t_cam0_velo)
                 depth[depth > MAX_DISTANCE] = MAX_DISTANCE
                 # depth = np.ma.array(depth, mask=depth > MAX_DISTANCE, fill_value=MAX_DISTANCE)
 
-                it_start = time.time()
-                mesh_pts = get_depth_pts(det, imgl, depth)
-                depth_mesh = Delaunay(mesh_pts[:, :2])  # .filled())
-                u, v, d = mesh_pts.T
-
-                # ----------------------------------------------------
-                #     Interpolating
-                # ----------------------------------------------------
-
-                to_resample = interpolate_pts(imgl, depth_mesh, mesh_pts, verbose=True)
-
-                # ----------------------------------------------------
-                #       Cost Calculation
-                # ----------------------------------------------------
-
-                c_interpolated, good_c_pts, bad_c_pts = calculate_costs(imgl, imgr, to_resample,
-                                                                        mesh_pts, verbose=True)
-
-                idx = np.argsort(bad_c_pts[:, -1])[::-1]
-                num_pts_per_resample = 25
-                eval_resampling_costs = False
-                resampling_pts = bad_c_pts[idx[:num_pts_per_resample], :3]
-                still_to_resample = bad_c_pts[idx[num_pts_per_resample:]]
-                # cost_bad_pts = n x [u, v, d, c]
-                resampled_pts = resample_iterate(imgl, imgr, resampling_pts,
-                                                 eval_resampling_costs=eval_resampling_costs,
-                                                 verbose=True)
-
-                new_mesh_pts = np.vstack((mesh_pts, good_c_pts[:, :3], resampled_pts))
-                new_mesh_pts = new_mesh_pts[new_mesh_pts[:, 2] < MAX_DISTANCE]
-                new_mesh = Delaunay(new_mesh_pts[:, :2])  # .filled())
-
+                # it_start = time.time()
+                # itr_points = ITR.depth_img_iterative_recon(img_l=imgl, img_r=imgr, depth_prediction=depth,
+                #                                            return_plot=False, frame_num=counter, img_shape=imgl.shape,
+                #                                            verbose=False)
+                # itr_mesh = Delaunay(itr_points[:, :2])
                 # Now need to show a comparison before and after resampling
-                it_stop = time.time()
+                # it_stop = time.time()
 
-                dpi = 40
-                # figsize = 2*height / float(dpi), 2*width / float(dpi)
-                figsize = width / float(dpi), height / float(dpi)
-                fig, ax = plt.subplots(2, 3, figsize=figsize)  # , dpi=dpi)
-                fig.tight_layout(pad=2)
+                orb_pts = TR_func.get_depth_pts(orb, imgl, disparity)
+                sift_pts = TR_func.get_depth_pts(sift, imgl, disparity)
+                # surf_pts = TR_func.get_depth_pts(surf, imgl, disparity)
 
-                disp_im = ax[0, 0].imshow(disp[0, :, :, 0].squeeze(), 'jet')
-                ax[0, 0].set_title(f"Disparity img frame {counter}")
-                divider = make_axes_locatable(ax[0, 0])
-                cax = divider.append_axes('right', size='5%', pad=0.05)
-                fig.colorbar(disp_im, cax=cax, orientation='vertical')
+                pt_list = [orb_pts, sift_pts]  # , surf_pts]
+                title_list = ["Orb Points", "Sift Points"]  # , "Surf Points"]
 
-                depth_im = ax[0, 1].imshow(depth, 'jet')
-                ax[0, 1].set_title(f"Bounded depth img frame {counter}")
-                divider = make_axes_locatable(ax[0, 1])
-                cax = divider.append_axes('right', size='5%', pad=0.05)
-                fig.colorbar(depth_im, cax=cax, orientation='vertical')
+                errors, plot = get_errors(disparity, dataset, frame=counter, pt_list=pt_list, title_list=title_list,
+                                          plot=True)
 
-                ax[0, 2].hist(depth.flatten(), bins=100)
-                ax[0, 2].set_title("Histogram of depth predictions")
+                e_orb.append(errors[0])
+                e_sift.append(errors[1])
 
-                ax[1, 0].imshow(imgl)
-                sc = ax[1, 0].scatter(u, v, c=d, s=10, cmap='jet')
-                ax[1, 0].set_title(f"Scattered pts before Tunable Recon - Frame {counter}")
-                divider = make_axes_locatable(ax[1, 0])
-                cax = divider.append_axes('right', size='5%', pad=0.05)
-                fig.colorbar(sc, cax=cax, orientation='vertical')
-
-                ax[1, 1].imshow(imgl)
-                u2, v2, d2 = new_mesh_pts.T
-                sc1 = ax[1, 1].scatter(u2, v2, c=d2, s=10, cmap='jet')
-                ax[1, 1].set_title(f"Scattered pts after Tunable Recon - Frame {counter}")
-                divider = make_axes_locatable(ax[1, 1])
-                cax = divider.append_axes('right', size='5%', pad=0.05)
-                fig.colorbar(sc1, cax=cax, orientation='vertical')
-
-                ax[1, 2].hist(new_mesh_pts[:, 2], bins=100)
-                ax[1, 2].set_title("Histogram after tunable reconstruction")
-
-                for axes in ax[:2, :2]:
-                    for a in axes:
-                        a.axis('off')
-
-                # plt.show()
-                fig.canvas.draw()
-                plot = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8,
-                                     sep='')
-                plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-
-                out_savepath = os.path.join(out_save_dir, dataset.left_image_files[counter])
-                query_savepath = os.path.join(query_save_dir, dataset.left_image_files[counter])
 
                 # img is rgb, convert to opencv's default bgr
                 plot = cv2.cvtColor(plot, cv2.COLOR_RGB2BGR)
-
-                print(f"Saving to: {out_savepath}")
-                cv2.imwrite(out_savepath, depth)
-                cv2.imwrite(query_savepath, imgl)
                 cv2.imshow('Before and after', plot)
                 cv2.waitKey(1)
 
-                print(
-                    f"Iteration:{counter}\n\tPred time: {time_pred}\n\ttunable_time{it_start - it_stop} for one "
-                    f"iteration")
-                # time.sleep(1)
+                e_fig, e_ax = plt.subplots()
+                e_fig.suptitle("MSE Errors by frame")
 
-                counter += 1
+                e_ax.plot(e_orb, label="ORB MSE")
+                e_ax.plot(e_sift, label="SIFT MSE")
+
+                e_ax.legend(loc='upper left')
+
+                e_fig.canvas.draw()
+                canv = np.fromstring(e_fig.canvas.tostring_rgb(), dtype=np.uint8,
+                                     sep='')
+                canv = canv.reshape(e_fig.canvas.get_width_height()[::-1] + (3,))
+                canv = cv2.cvtColor(canv, cv2.COLOR_RGB2BGR)
+                cv2.imshow('Error Plots', canv)
+                cv2.waitKey(1)
+
+                print(f"Avg Errors\n"
+                      f"\tORB: {np.mean(e_orb)}\n"
+                      f"\tSIFT: {np.mean(e_sift)}\n\n")
+
+                if save_fig:
+                    out_save_path = os.path.join(out_save_dir, dataset.left_image_files[counter])
+                    query_save_path = os.path.join(query_save_dir, dataset.left_image_files[counter])
+
+                    print(f"Saving to: {out_save_path}")
+                    cv2.imwrite(out_save_path, depth)
+                    cv2.imwrite(query_save_path, imgl)
+
+                # print(
+                #     f"Iteration:{counter}\n\tPred time: {time_pred}\n\ttunable_time{it_start - it_stop} for one "
+                #     f"iteration")
+                # time.sleep(1)
 
 
 def predict_all():
@@ -410,6 +428,8 @@ def predict_all():
 
 if __name__ == "__main__":
     # Need to make tunable_recon() save images in an output directory
+
+    RESAMPLING_ITERATIONS = 1
     tunable_recon()
 
     # predict_all()

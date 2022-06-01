@@ -19,14 +19,12 @@ Options:
 import os
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-import sys
 
-import numpy as np
+from mesh_pydnet.HyperParameters import *
+import TunableReconstruction.Functions_TunableReconstruction as TR_func
+import mesh_pydnet.ModularFiles.HuskyDataHandler as husky
+import TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
 
-from PythonMeshManipulation.mesh_pydnet.HyperParameters import *
-import PythonMeshManipulation.mesh_pydnet.TunableReconstruction.Functions_TunableReconstruction as TR_func
-import ModularFiles.HuskyDataHandler as husky
-import PythonMeshManipulation.mesh_pydnet.TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
 
 # ----------------------------------------------------------------------------
 
@@ -35,12 +33,6 @@ import PythonMeshManipulation.mesh_pydnet.TunableReconstruction.IterativeTunable
 #       Globals
 # ----------------------------------------------------------------------------
 
-# config_path = "/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/Tunable " \
-# "Reconstruction/mesh_depth.yaml "
-config_path = "/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet" \
-              "/TunableReconstruction/mesh_depth.yaml"
-
-depth_est = aru_py_mesh.PyDepth(config_path)
 
 
 def make_sparse_dense(sparse_img, get_colour=False, mask=True):
@@ -63,6 +55,20 @@ def pts_to_img(pts, imshape=IMAGE_SHAPE, dtype=np.uint8):
     idx = np.floor(pts[:, :2].T).astype(int)
     im[idx[1], idx[0]] = pts[:, 2]
     return im
+
+def sample_img(img, pts_2d):
+    r"""
+    Returns the values in the image for those points in:
+        u, v, sample
+    """
+    if pts_2d.shape[1]==2:
+        pts_2d = pts_2d.T
+
+    u,v = np.floor(pts_2d).astype(int)
+
+    samples = img[v,u]
+
+    return u,v,samples
 
 
 def lidar_to_img_frame(pts, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_matrix, img_shape=IMAGE_SHAPE):
@@ -202,7 +208,7 @@ def pt_to_pt_emap(predicted_img, gt_cam_pts, Tr=HuskyCalib.T_cam0_vel0, K=HuskyC
 def get_pt_to_pt_error(sample_pts, gt_pts, use_MSE=True):
     e_im = (sample_pts - gt_pts) ** 2
     if use_MSE:
-        e = e_im.sum() / e_im.count()
+        e = e_im.sum() / e_im.size
     else:
         e = np.sum(e_im)
 
@@ -219,14 +225,25 @@ def get_img_pt_to_pt_error(depth_im, uv, d, normalise_by_mean=False, img_shape=I
 
 
 def get_iterative_TR_error(imgl, imgr, lidar, use_MSE=True):
-    mesh, pts = ITR.iterative_recon(img_l=imgl, img_r=imgr, num_iterations=RESAMPLING_ITERATIONS,
-                                    num_pts_per_resample=25, eval_resampling_costs=False, frame=None,
-                                    before_after_plots=False, plot_its=False, save_fig_path=None, verbose=False)
+    mesh, pts = ITR.stereo_iterative_recon(img_l=imgl, img_r=imgr, num_iterations=RESAMPLING_ITERATIONS,
+                                           num_pts_per_resample=25, eval_resampling_costs=False, frame=None,
+                                           before_after_plots=False, plot_its=False, save_fig_path=None, verbose=False)
 
     uv = pts[:, :2]
     d = pts[:, 2]
     e = get_img_pt_to_pt_error(render_lidar(lidar, img_shape=imgl.shape), uv=uv, d=d, use_MSE=use_MSE)
     return e
+
+def rough_lidar_render(velo, k_dilate = 5, k_blur = 20, img_shape = IMAGE_SHAPE, mask=True):
+    lid_im = np.zeros(img_shape[:2])
+    u,v,disp = velo.T
+    u,v = np.floor((u,v)).astype(int)
+    lid_im[v, u] = disp
+
+    lid_im = cv2.blur(cv2.dilate(lid_im, np.ones((k_dilate, k_dilate))), (k_blur, k_blur))
+    if mask:
+        lid_im = np.ma.masked_where(lid_im==0, lid_im)
+    return lid_im
 
 
 if __name__ == "__main__":
@@ -306,9 +323,11 @@ if __name__ == "__main__":
 
 
         """
-        velo = dataset.get_lidar(frame)
+        # velo = dataset.get_lidar(frame)
+        velo = dataset.get_lidar(i)
         # img = cv2.cvtColor(dataset.get_cam0(frame), cv2.COLOR_BRG2RGB)
-        img = dataset.get_cam0(frame)
+        # img = dataset.get_cam0(frame)
+        img = dataset.get_cam0(i)
 
         u, v, gt_depth = lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.left_camera_matrix,
                                             img_shape=img.shape)

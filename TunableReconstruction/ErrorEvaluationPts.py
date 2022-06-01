@@ -31,8 +31,7 @@ from PythonMeshManipulation.mesh_pydnet.HyperParameters import *
 
 # config_path = "/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/Tunable " \
 # "Reconstruction/mesh_depth.yaml "
-config_path = "/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet" \
-              "/TunableReconstruction/mesh_depth.yaml"
+config_path = "/PythonMeshManipulation/TunableReconstruction/mesh_depth.yaml"
 
 depth_est = aru_py_mesh.PyDepth(config_path)
 
@@ -144,7 +143,7 @@ if __name__ == "__main__":
     frame = 0
     im0 = np.array(data.get_cam0(0))
     im1 = np.array(data.get_cam1(0))
-    mesh, pts = it_recon.iterative_recon(im0, im1, before_after_plots=True)
+    mesh, pts = it_recon.stereo_iterative_recon(im0, im1, before_after_plots=True)
 
     import matplotlib.pyplot as plt
 

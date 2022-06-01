@@ -11,21 +11,16 @@ import cv2
 
 import sys
 
-sys.path.insert(0, '/home/kats/Documents/Repos/aru-core/build/lib/')
-import aru_py_mesh
+import mesh_pydnet.HuskyCalib as HuskyCalib
 
-# global NUM_INITIAL_FEATURES
-# global LOWE_DISTANCE_RATIO
-# global MAX_DISTANCE
-# global MAX_NUM_FEATURES_DETECT
-# global MIN_DISTANCE
-# global TRIANGLE_SAMPLES_PER_PIX_SQUARED
-# global DETECTOR
-# global INTERPOLATING_POINTS
+if "aru_core_lib" not in sys.modules:
+    # you may need a symbolic link to the build of aru_core library
+    import aru_core_lib.aru_py_mesh as aru_py_mesh
 
-global K
-global R
-global t
+
+config_path = "/home/kats/Code/PythonMeshManipulation/TunableReconstruction/mesh_depth.yaml"
+depth_est = aru_py_mesh.PyDepth(config_path)
+
 
 # K, R, t, _, _, _, _ = cv2.decomposeProjectionMatrix(data.calib.P_rect_10)
 # t = t[:3] / t[3]  # normalising translation vector
@@ -46,7 +41,6 @@ RESAMPLING_ITERATIONS = 3
 IMAGE_SHAPE = (720, 1280, 3)
 PREDICTION_SHAPE = (384, 640)
 
-import PythonMeshManipulation.mesh_pydnet.HuskyCalib as HuskyCalib
 ZED_t = HuskyCalib.t_cam0_velo
 ZED_R = HuskyCalib.R_rect_cam0
 
