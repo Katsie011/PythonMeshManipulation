@@ -27,7 +27,8 @@ test_filenames = "/media/kats/Katsoulis3/Datasets/Husky/Testing Data/Test_Route_
 train_filenames = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Route_C/training_file_list.txt'
 output_directory = os.path.join(test_dir, 'predictions')
 # checkpoint_dir = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train1/tmp/Husky5000/Husky'
-checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/pydnet/checkpoint/Husky5000/Husky'
+# checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/pydnet/checkpoint/Husky5000/Husky'
+checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/pydnet/checkpoint/Husky10K/Husky'
 
 parser = argparse.ArgumentParser(description='Argument parser')
 
@@ -114,7 +115,7 @@ def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plo
     If plot == true:
         makes a plot of the errors and displays
     """
-    query_im = dataset.get_cam0(frame)
+    query_im = cv2.cvtColor(dataset.get_cam0(frame), cv2.COLOR_RGB2BGR)
     velo = dataset.get_lidar(frame)
     u, v, gt_depth = ee.lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.calib.cam0_camera_matrix,
                                            img_shape=query_im.shape)
@@ -123,7 +124,7 @@ def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plo
 
     pred_e = ee.quantify_img_error_lidar(pred_disp_img, velo_cam)
 
-    errors = np.zeros(len(pt_list))
+    errors = np.zeros(len(pt_list)+1)
     if plot:
         # if make plot of pts:
         cols = 2
@@ -145,6 +146,26 @@ def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plo
 
     # make lidar into ground truth image
     gt_im = ee.rough_lidar_render(velo_cam)
+    u, v, gt_depth = ee.lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.calib.cam0_camera_matrix,
+                                           img_shape=query_im.shape)
+    gt_disparity = TR_func.depth_to_disparity(gt_depth, dataset.calib.cam0_camera_matrix, dataset.calib.baseline)
+    velo_cam = np.floor(np.stack((u, v, gt_disparity), axis=1)).astype(int)
+
+    emap = ee.pt_to_pt_emap(predicted_img=pred_disp_img, gt_cam_pts=velo_cam, mask=True,
+                            colourmap=None)
+    errors[0] = np.mean(emap)
+
+    if plot:
+        b = ax[1, 1]
+        b.axis('off')
+
+
+        im = b.imshow(emap, 'jet')
+        divider = make_axes_locatable(b)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cb = plt.colorbar(im, cax=cax)
+        cb.set_label("Disparity SSE")
+        b.set_title(f"Error Map. MSE:{np.mean(emap):.2f}")
 
     for i, pts in enumerate(pt_list):
         # get predicted depth for each point from the pts
@@ -155,7 +176,7 @@ def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plo
                                         img_shape=query_im.shape, use_MSE=True)
 
         # append to errors list
-        errors[i] = err
+        errors[i+1] = err
 
         if plot:
             print(f"Using axis: [{1 // cols}, {i % cols}]")
@@ -176,20 +197,6 @@ def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plo
             cb.set_label("Disparity")
             a.set_title(title_list[i] + f" - MSE: {err:.1f} and with {len(pt_list[i])} pts")
 
-            b = ax[1 + i, 1]
-            b.axis('off')
-
-            u, v, gt_depth = ee.lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.calib.cam0_camera_matrix,
-                                                img_shape=query_im.shape)
-            gt_disparity = TR_func.depth_to_disparity(gt_depth, dataset.calib.cam0_camera_matrix, dataset.calib.baseline)
-            velo_cam = np.floor(np.stack((u, v, gt_disparity), axis=1)).astype(int)
-            im = b.imshow(ee.pt_to_pt_emap(predicted_img=pred_disp_img, gt_cam_pts=velo_cam, mask=True,
-                                                  colourmap=None), 'jet')
-            divider = make_axes_locatable(b)
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            cb = plt.colorbar(im, cax=cax)
-            cb.set_label("Disparity MSE")
-            b.set_title(f"Error Map. MSE:{errors[i]:.2f}")
 
 
     if plot:
@@ -212,6 +219,7 @@ def tunable_recon(save_fig=False, verbose=False):
 
     e_sift = []
     e_orb = []
+    e_pred=[]
 
     # Writing out images
     out_save_dir = os.path.join(args.output_directory, "output", 'image_00', 'data')
@@ -270,9 +278,9 @@ def tunable_recon(save_fig=False, verbose=False):
 
                 errors, plot = get_errors(disparity, dataset, frame=counter, pt_list=pt_list, title_list=title_list,
                                           plot=True)
-
-                e_orb.append(errors[0])
-                e_sift.append(errors[1])
+                e_pred.append(errors[0])
+                e_orb.append(errors[1])
+                e_sift.append(errors[2])
 
 
                 # img is rgb, convert to opencv's default bgr
@@ -281,10 +289,12 @@ def tunable_recon(save_fig=False, verbose=False):
                 cv2.waitKey(1)
 
                 e_fig, e_ax = plt.subplots()
-                e_fig.suptitle("MSE Errors by frame")
+                e_fig.suptitle("MSE Disparity Error by frame")
 
-                e_ax.plot(e_orb, label="ORB MSE")
-                e_ax.plot(e_sift, label="SIFT MSE")
+                e_ax.plot(e_pred, label="Prediction MSE")
+                e_ax.text(len(e_pred)-1, e_pred[-1], f"Error: {e_pred[-1]:.2f}")
+                # e_ax.plot(e_orb, label="ORB points MSE")
+                # e_ax.plot(e_sift, label="SIFT points MSE")
 
                 e_ax.legend(loc='upper left')
 
