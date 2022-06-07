@@ -1,7 +1,7 @@
 # PythonMeshManipulation
-## Errors using dense interpolation written by my supervisor, Dr Paul Amayo
+## Using a monocular camera to get depth predictions
 
-Finding errors in meshes made from dense depth maps. 
-
-Exploring using different techniques for feature selection. These features are then used to find the reconstruction error from the resulting sparse mesh.
+Using pydepth to estimate depth from a monocular camera. 
+This is done as opposed to stereo to improve generalisation of mapping between different platforms. 
+Stereo's farfield resolution is directly coupled to the baseline as well. For an algorithm to be useful on smaller robots and drones, using a large baseline is not feasable.
 
