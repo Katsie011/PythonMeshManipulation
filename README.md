@@ -1,10 +1,7 @@
 # PythonMeshManipulation
-Working on interacting with meshes in python.
+## Using a monocular camera to get depth predictions
 
-Goal is to:
+Using pydepth to estimate depth from a monocular camera. 
+This is done as opposed to stereo to improve generalisation of mapping between different platforms. 
+Stereo's farfield resolution is directly coupled to the baseline as well. For an algorithm to be useful on smaller robots and drones, using a large baseline is not feasable.
 
-- [ ] Generate random meshes
-- [ ] Triangulate the meshes
-- [ ] Implement various coordinate systems
-  - [ ] Focus on Local Barycentric Coordinates
-- [ ] Start manipulating meshes
