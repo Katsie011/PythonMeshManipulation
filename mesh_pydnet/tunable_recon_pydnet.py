@@ -28,7 +28,7 @@ train_filenames = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Rou
 output_directory = os.path.join(test_dir, 'predictions')
 # checkpoint_dir = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train1/tmp/Husky5000/Husky'
 # checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/pydnet/checkpoint/Husky5000/Husky'
-checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/pydnet/checkpoint/Husky10K/Husky'
+checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/checkpoints/Husky10K/Husky'
 
 parser = argparse.ArgumentParser(description='Argument parser')
 
@@ -71,14 +71,6 @@ def setup():
 def get_dataset():
     if args.dataset.lower() == 'husky':
         print("Using Husky data")
-        # # print("\t Training Directory:", training_dir)
-        # # files = pd.read_csv(train_filenames, sep=" ", names=["left", "right"]).sample(10).reset_index()
-        #
-        # print("\t Testing Directory:", test_dir)
-        # left_files = os.listdir(os.path.join(test_dir, 'left'))
-        # right_files = os.listdir(os.path.join(test_dir, 'right'))
-        # files = pd.DataFrame(data=np.array((left_files, right_files)).T, columns=["left", "right"])
-
         return husky.Dataset_Handler(test_dir)
 
     # elif args.dataset.lower() == 'kitti':
@@ -241,9 +233,9 @@ def tunable_recon(save_fig=False, verbose=False):
             loader.restore(sess, args.checkpoint_dir)
 
             for counter in tqdm.trange(dataset.num_frames):
-                imgl_fname = dataset.get_cam0(counter)
-                imgr_fname = dataset.get_cam1(counter)
-                velo_fname = dataset.get_lidar(counter)
+                # imgl_fname = dataset.get_cam0(counter)
+                # imgr_fname = dataset.get_cam1(counter)
+                # velo_fname = dataset.get_lidar(counter)
                 imgl = dataset.get_cam0(counter)
                 imgr = dataset.get_cam1(counter)
 
@@ -324,8 +316,8 @@ def tunable_recon(save_fig=False, verbose=False):
                 # time.sleep(1)
 
 
-def predict_all():
-    printflag = True
+def predict_all(save_fig=False, verbose=False):
+    verbose = True
 
     data_files = get_dataset()
     imgs = []
@@ -414,9 +406,9 @@ def predict_all():
 
         out_savepath = os.path.join(out_save_dir, img_filenames[i])
         query_savepath = os.path.join(query_save_dir, img_filenames[i])
-        if printflag:
+        if verbose:
             print("Saving to:", out_savepath)
-            printflag = False
+            verbose = False
 
         if not i % (len(data_files) // 10):
             fig, ax = plt.subplots(1, 2, figsize=(20, 10))
@@ -440,7 +432,7 @@ if __name__ == "__main__":
     # Need to make tunable_recon() save images in an output directory
 
     RESAMPLING_ITERATIONS = 1
-    tunable_recon()
+    tunable_recon(save_fig=True)
 
     # predict_all()
     pass

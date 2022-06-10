@@ -1,10 +1,10 @@
 import numpy as np
 import yaml
 with open(
-        r'/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/aru-calibration/ZED/left.yaml') as file:
+        r'/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/aru-calibration/ZED/left.yaml') as file:
     left_vars = yaml.load(file, Loader=yaml.FullLoader)
 with open(
-        r'/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/aru-calibration/ZED/right.yaml') as file:
+        r'/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/aru-calibration/ZED/right.yaml') as file:
     right_vars = yaml.load(file, Loader=yaml.FullLoader)
 
 left_distortion_coefficients = np.array(left_vars['distortion_coefficients']['data']).reshape(
