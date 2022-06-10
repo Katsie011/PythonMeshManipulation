@@ -1,0 +1,7 @@
+./mesh_pydnet/pydnet/*
+*.tfevents.*
+.idea/*
+*__pycache__*
+.ipynb_checkpoints/*
+Figures/*
+
