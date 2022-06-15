@@ -1,17 +1,14 @@
 import time
 
-import numpy as np
 import tqdm
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 from scipy.spatial import Delaunay
-import tensorflow as tf
 # import tensorflow.compat.v1 as tf
 import argparse
 
 from mesh_pydnet.HyperParameters import *
-import TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
 import TunableReconstruction.Functions_TunableReconstruction as TR_func
 import ModularFiles.ImgFeatureExtactorModule as feat
 import ModularFiles.HuskyDataHandler as husky
@@ -20,12 +17,12 @@ import TunableReconstruction.ErrorEvaluationImgs as ee
 from pydnet.utils import *
 from pydnet.pydnet import *
 
-data_dir = r"/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route C"
-training_dir = "/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Route_C"
-test_dir = "/media/kats/Katsoulis3/Datasets/Husky/Testing Data/Test_Route_C"
-test_filenames = "/media/kats/Katsoulis3/Datasets/Husky/Testing Data/Test_Route_C/test_file_list.txt"
-train_filenames = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Route_C/training_file_list.txt'
-output_directory = os.path.join(test_dir, 'predictions')
+data_dir = r"/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/RouteC/2022_05_03_14_09_01"
+# training_dir = "/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Route_C"
+# test_dir = "/media/kats/Katsoulis3/Datasets/Husky/Testing Data/Test_Route_C"
+# test_filenames = "/media/kats/Katsoulis3/Datasets/Husky/Testing Data/Test_Route_C/test_file_list.txt"
+# train_filenames = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train_Route_C/training_file_list.txt'
+output_directory = os.path.join(data_dir, 'predictions')
 # checkpoint_dir = '/media/kats/Katsoulis3/Datasets/Husky/Training Data/Train1/tmp/Husky5000/Husky'
 # checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/pydnet/checkpoint/Husky5000/Husky'
 checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/checkpoints/Husky10K/Husky'
@@ -33,9 +30,7 @@ checkpoint_dir = '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshM
 parser = argparse.ArgumentParser(description='Argument parser')
 
 parser.add_argument('--dataset', type=str, help='dataset to train on, kitti, or Husky', default='Husky')
-parser.add_argument('--datapath', type=str, help='path to the data', default=test_dir)  # required=True)
-parser.add_argument('--filenames', type=str, help='path to the filenames text file',
-                    default=test_filenames)  # required=True)
+parser.add_argument('--datapath', type=str, help='path to the data', default=data_dir)  # required=True)
 parser.add_argument('--output_directory', type=str,
                     help='output directory for test disparities, if empty outputs to checkpoint folder',
                     default=output_directory)
@@ -71,7 +66,7 @@ def setup():
 def get_dataset():
     if args.dataset.lower() == 'husky':
         print("Using Husky data")
-        return husky.Dataset_Handler(test_dir)
+        return husky.DatasetHandler(data_dir)
 
     # elif args.dataset.lower() == 'kitti':
     #     print("Overriding and using Kitti Data")
@@ -202,7 +197,7 @@ def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plo
     return errors
 
 
-def tunable_recon(save_fig=False, verbose=False):
+def tunable_recon(save_fig=False, error_plots=True, verbose=False):
     dataset = get_dataset()
 
     sift = feat.FeatureDetector(det_type='sift', max_num_ft=MAX_NUM_FEATURES_DETECT)
@@ -251,6 +246,7 @@ def tunable_recon(save_fig=False, verbose=False):
 
                 depth = TR_func.disparity_to_depth(disparity, HuskyCalib.left_camera_matrix, HuskyCalib.t_cam0_velo)
                 depth[depth > MAX_DISTANCE] = MAX_DISTANCE
+
                 # depth = np.ma.array(depth, mask=depth > MAX_DISTANCE, fill_value=MAX_DISTANCE)
 
                 # it_start = time.time()
@@ -261,52 +257,53 @@ def tunable_recon(save_fig=False, verbose=False):
                 # Now need to show a comparison before and after resampling
                 # it_stop = time.time()
 
-                orb_pts = TR_func.get_depth_pts(orb, imgl, disparity)
-                sift_pts = TR_func.get_depth_pts(sift, imgl, disparity)
-                # surf_pts = TR_func.get_depth_pts(surf, imgl, disparity)
+                if error_plots:
+                    orb_pts = TR_func.get_depth_pts(orb, imgl, disparity)
+                    sift_pts = TR_func.get_depth_pts(sift, imgl, disparity)
+                    # surf_pts = TR_func.get_depth_pts(surf, imgl, disparity)
 
-                pt_list = [orb_pts, sift_pts]  # , surf_pts]
-                title_list = ["Orb Points", "Sift Points"]  # , "Surf Points"]
+                    pt_list = [orb_pts, sift_pts]  # , surf_pts]
+                    title_list = ["Orb Points", "Sift Points"]  # , "Surf Points"]
 
-                errors, plot = get_errors(disparity, dataset, frame=counter, pt_list=pt_list, title_list=title_list,
-                                          plot=True)
-                e_pred.append(errors[0])
-                e_orb.append(errors[1])
-                e_sift.append(errors[2])
+                    errors, plot = get_errors(disparity, dataset, frame=counter, pt_list=pt_list, title_list=title_list,
+                                              plot=True)
+                    e_pred.append(errors[0])
+                    e_orb.append(errors[1])
+                    e_sift.append(errors[2])
 
 
-                # img is rgb, convert to opencv's default bgr
-                plot = cv2.cvtColor(plot, cv2.COLOR_RGB2BGR)
-                cv2.imshow('Before and after', plot)
-                cv2.waitKey(1)
+                    # img is rgb, convert to opencv's default bgr
+                    plot = cv2.cvtColor(plot, cv2.COLOR_RGB2BGR)
+                    cv2.imshow('Before and after', plot)
+                    cv2.waitKey(1)
 
-                e_fig, e_ax = plt.subplots()
-                e_fig.suptitle("MSE Disparity Error by frame")
+                    e_fig, e_ax = plt.subplots()
+                    e_fig.suptitle("MSE Disparity Error by frame")
 
-                e_ax.plot(e_pred, label="Prediction MSE")
-                e_ax.text(len(e_pred)-1, e_pred[-1], f"Error: {e_pred[-1]:.2f}")
-                # e_ax.plot(e_orb, label="ORB points MSE")
-                # e_ax.plot(e_sift, label="SIFT points MSE")
+                    e_ax.plot(e_pred, label="Prediction MSE")
+                    e_ax.text(len(e_pred)-1, e_pred[-1], f"Error: {e_pred[-1]:.2f}")
+                    # e_ax.plot(e_orb, label="ORB points MSE")
+                    # e_ax.plot(e_sift, label="SIFT points MSE")
 
-                e_ax.legend(loc='upper left')
+                    e_ax.legend(loc='upper left')
 
-                e_fig.canvas.draw()
-                canv = np.fromstring(e_fig.canvas.tostring_rgb(), dtype=np.uint8,
-                                     sep='')
-                canv = canv.reshape(e_fig.canvas.get_width_height()[::-1] + (3,))
-                canv = cv2.cvtColor(canv, cv2.COLOR_RGB2BGR)
-                cv2.imshow('Error Plots', canv)
-                cv2.waitKey(1)
+                    e_fig.canvas.draw()
+                    canv = np.fromstring(e_fig.canvas.tostring_rgb(), dtype=np.uint8,
+                                         sep='')
+                    canv = canv.reshape(e_fig.canvas.get_width_height()[::-1] + (3,))
+                    canv = cv2.cvtColor(canv, cv2.COLOR_RGB2BGR)
+                    cv2.imshow('Error Plots', canv)
+                    cv2.waitKey(1)
 
-                print(f"Avg Errors\n"
-                      f"\tORB: {np.mean(e_orb)}\n"
-                      f"\tSIFT: {np.mean(e_sift)}\n\n")
+                    print(f"Avg Errors\n"
+                          f"\tORB: {np.mean(e_orb)}\n"
+                          f"\tSIFT: {np.mean(e_sift)}\n\n")
 
                 if save_fig:
                     out_save_path = os.path.join(out_save_dir, dataset.left_image_files[counter])
                     query_save_path = os.path.join(query_save_dir, dataset.left_image_files[counter])
 
-                    print(f"Saving to: {out_save_path}")
+                    if verbose: print(f"Saving to: {out_save_path}")
                     cv2.imwrite(out_save_path, depth)
                     cv2.imwrite(query_save_path, imgl)
 
@@ -316,123 +313,123 @@ def tunable_recon(save_fig=False, verbose=False):
                 # time.sleep(1)
 
 
-def predict_all(save_fig=False, verbose=False):
-    verbose = True
-
-    data_files = get_dataset()
-    imgs = []
-    disps = []
-    img_filenames = []
-
-    with tf.Graph().as_default():
-
-        height = args.height
-        width = args.width
-        placeholders = {'im0': tf.compat.v1.placeholder(tf.float32, [None, None, None, 3], name='im0')}
-
-        with tf.compat.v1.variable_scope("model") as scope:
-            model = pydnet(placeholders)
-
-        init = tf.group(tf.compat.v1.global_variables_initializer(),
-                        tf.compat.v1.local_variables_initializer())
-
-        loader = tf.compat.v1.train.Saver()
-        saver = tf.compat.v1.train.Saver()
-
-        show_flag = True
-
-        with tf.compat.v1.Session() as sess:
-            sess.run(init)
-            loader.restore(sess, args.checkpoint_dir)
-
-            counter = 0
-            while counter < len(data_files):
-                if args.dataset.lower() == 'husky':
-                    img_file = data_files['left'][counter]
-                    img_path = os.path.join(test_dir, 'left', img_file)
-                    # img_path = os.path.join(training_dir, img_file)
-                else:
-                    img_path = data_files['left'][counter]
-                    img_file = f'left/{os.path.basename(img_path)}'
-                # img_path = os.path.join(test_dir, data_files['left'][counter])
-                img = read_image(img_path)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-                img = cv2.resize(img, (width, height)).astype(np.float32) / 255.
-                img = np.expand_dims(img, 0)
-                start = time.time()
-                disp = sess.run(model.results[args.resolution - 1], feed_dict={placeholders['im0']: img})
-                end = time.time()
-
-                disparity = disp[0, :, :, 0].squeeze()
-
-                img_file = os.path.splitext(img_file)[0]
-
-                imgs.append(img[0])
-                img_filenames.append(img_file)
-                disps.append(disparity)
-
-                if show_flag:
-                    fig, ax = plt.subplots(1, 2, figsize=(20, 10))
-                    fig.tight_layout()
-                    ax[0].imshow(imgs[-1])
-                    ax[1].imshow(disps[-1], cmap='jet')
-                    plt.show()
-
-                    show_flag = False
-
-                # if os.path.isdir(args.output_directory):
-                #     # Saving to supplied directory
-                #     if printflag:
-                #         print(f"Saving to: {os.path.join(args.output_directory, img_path)}")
-                #         printflag = True
-                #
-                #     np.save(os.path.join(args.output_directory, img_path), disparity)
-                # else:
-                #     # Saving to training data dir
-
-                counter += 1
-
-    # Writing out images
-    out_save_dir = os.path.join(args.output_directory, "output")
-    query_save_dir = os.path.join(args.output_directory, "input")
-
-    if not os.path.isdir(os.path.split(os.path.join(out_save_dir, img_filenames[0]))[0]):
-        os.makedirs(os.path.split(os.path.join(out_save_dir, img_filenames[0]))[0])
-    if not os.path.isdir(os.path.split(os.path.join(query_save_dir, img_filenames[0]))[0]):
-        os.makedirs(os.path.split(os.path.join(query_save_dir, img_filenames[0]))[0])
-
-    for i in range(len(disps)):
-
-        out_savepath = os.path.join(out_save_dir, img_filenames[i])
-        query_savepath = os.path.join(query_save_dir, img_filenames[i])
-        if verbose:
-            print("Saving to:", out_savepath)
-            verbose = False
-
-        if not i % (len(data_files) // 10):
-            fig, ax = plt.subplots(1, 2, figsize=(20, 10))
-            fig.tight_layout(pad=5.0)
-            ax[0].imshow(imgs[i])
-            ax[1].imshow(disps[i], cmap='jet')
-            plt.show()
-
-        # np.save(savepath+'.npy', disparity)
-
-        # They scale disparity by 0.3*img width. So will multiply back by this factor
-
-        cv2.imwrite(out_savepath + '.png', disps[i] * (0.3 * disparity.shape[1]))
-        cv2.imwrite(query_savepath + '.png', imgs[i] * 255)
-        cv2.imshow(f"Output {i}", imgs[i])
-
-    pass
+# def predict_all(save_fig=False, verbose=False):
+#     verbose = True
+#
+#     data_files = get_dataset()
+#     imgs = []
+#     disps = []
+#     img_filenames = []
+#
+#     with tf.Graph().as_default():
+#
+#         height = args.height
+#         width = args.width
+#         placeholders = {'im0': tf.compat.v1.placeholder(tf.float32, [None, None, None, 3], name='im0')}
+#
+#         with tf.compat.v1.variable_scope("model") as scope:
+#             model = pydnet(placeholders)
+#
+#         init = tf.group(tf.compat.v1.global_variables_initializer(),
+#                         tf.compat.v1.local_variables_initializer())
+#
+#         loader = tf.compat.v1.train.Saver()
+#         saver = tf.compat.v1.train.Saver()
+#
+#         show_flag = True
+#
+#         with tf.compat.v1.Session() as sess:
+#             sess.run(init)
+#             loader.restore(sess, args.checkpoint_dir)
+#
+#             counter = 0
+#             while counter < len(data_files):
+#                 if args.dataset.lower() == 'husky':
+#                     img_file = data_files['left'][counter]
+#                     img_path = os.path.join(test_dir, 'left', img_file)
+#                     # img_path = os.path.join(training_dir, img_file)
+#                 else:
+#                     img_path = data_files['left'][counter]
+#                     img_file = f'left/{os.path.basename(img_path)}'
+#                 # img_path = os.path.join(test_dir, data_files['left'][counter])
+#                 img = read_image(img_path)
+#                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+#
+#                 img = cv2.resize(img, (width, height)).astype(np.float32) / 255.
+#                 img = np.expand_dims(img, 0)
+#                 start = time.time()
+#                 disp = sess.run(model.results[args.resolution - 1], feed_dict={placeholders['im0']: img})
+#                 end = time.time()
+#
+#                 disparity = disp[0, :, :, 0].squeeze()
+#
+#                 img_file = os.path.splitext(img_file)[0]
+#
+#                 imgs.append(img[0])
+#                 img_filenames.append(img_file)
+#                 disps.append(disparity)
+#
+#                 if show_flag:
+#                     fig, ax = plt.subplots(1, 2, figsize=(20, 10))
+#                     fig.tight_layout()
+#                     ax[0].imshow(imgs[-1])
+#                     ax[1].imshow(disps[-1], cmap='jet')
+#                     plt.show()
+#
+#                     show_flag = False
+#
+#                 # if os.path.isdir(args.output_directory):
+#                 #     # Saving to supplied directory
+#                 #     if printflag:
+#                 #         print(f"Saving to: {os.path.join(args.output_directory, img_path)}")
+#                 #         printflag = True
+#                 #
+#                 #     np.save(os.path.join(args.output_directory, img_path), disparity)
+#                 # else:
+#                 #     # Saving to training data dir
+#
+#                 counter += 1
+#
+#     # Writing out images
+#     out_save_dir = os.path.join(args.output_directory, "output")
+#     query_save_dir = os.path.join(args.output_directory, "input")
+#
+#     if not os.path.isdir(os.path.split(os.path.join(out_save_dir, img_filenames[0]))[0]):
+#         os.makedirs(os.path.split(os.path.join(out_save_dir, img_filenames[0]))[0])
+#     if not os.path.isdir(os.path.split(os.path.join(query_save_dir, img_filenames[0]))[0]):
+#         os.makedirs(os.path.split(os.path.join(query_save_dir, img_filenames[0]))[0])
+#
+#     for i in range(len(disps)):
+#
+#         out_savepath = os.path.join(out_save_dir, img_filenames[i])
+#         query_savepath = os.path.join(query_save_dir, img_filenames[i])
+#         if verbose:
+#             print("Saving to:", out_savepath)
+#             verbose = False
+#
+#         if not i % (len(data_files) // 10):
+#             fig, ax = plt.subplots(1, 2, figsize=(20, 10))
+#             fig.tight_layout(pad=5.0)
+#             ax[0].imshow(imgs[i])
+#             ax[1].imshow(disps[i], cmap='jet')
+#             plt.show()
+#
+#         # np.save(savepath+'.npy', disparity)
+#
+#         # They scale disparity by 0.3*img width. So will multiply back by this factor
+#
+#         cv2.imwrite(out_savepath + '.png', disps[i] * (0.3 * disparity.shape[1]))
+#         cv2.imwrite(query_savepath + '.png', imgs[i] * 255)
+#         cv2.imshow(f"Output {i}", imgs[i])
+#
+#     pass
 
 
 if __name__ == "__main__":
     # Need to make tunable_recon() save images in an output directory
 
     RESAMPLING_ITERATIONS = 1
-    tunable_recon(save_fig=True)
+    tunable_recon(save_fig=True, error_plots=False)
 
     # predict_all()
-    pass
+

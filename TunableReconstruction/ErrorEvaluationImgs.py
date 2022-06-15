@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 
 from mesh_pydnet.HyperParameters import *
 import TunableReconstruction.Functions_TunableReconstruction as TR_func
-import mesh_pydnet.ModularFiles.HuskyDataHandler as husky
+import ModularFiles as husky
 import TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
 
 

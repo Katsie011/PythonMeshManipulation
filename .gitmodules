@@ -4,6 +4,3 @@
 [submodule "mesh_pydnet/ModularFiles"]
 	path = mesh_pydnet/ModularFiles
 	url = https://github.com/Katsie011/python-modular-files-aru-core.git
-[submodule "temp/aru-calibration"]
-	path = temp/aru-calibration
-	url = https://github.com/African-Robotics-Unit/aru-calibration.git
