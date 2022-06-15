@@ -1,0 +1,45 @@
+%YAML:1.0
+
+FeatureExtractor:
+  num_features:
+    2000
+  num_levels:
+    8
+  scale_factor:
+    1.2
+  initial_fast_threshold:
+    20
+  minimum_fast_threshold:
+    7
+  patch_size:
+    31
+  edge_threshold:
+    19
+FeatureMatcher:
+  match_threshold_high:
+    100
+  match_threshold_low:
+    50
+  stereo_baseline:
+    0.12
+  focal_length:
+    286
+
+FeatureSolver:
+  ransac_prob:
+    0.95
+  ransac_max_iterations:
+    100
+  inlier_threshold:
+    3.0
+  CameraMatrix: !!opencv-matrix
+    rows: 3
+    cols: 3
+    dt: f
+    data: [525.2427570343234 ,    0.     ,  339.07352233962,
+            0.     ,  524.8957162605561,  227.6135227986774,
+            0.     ,    0.     ,    1.    ]
+
+
+
+
