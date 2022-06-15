@@ -23,7 +23,7 @@ FeatureMatcher:
   stereo_baseline:
     0.12
   focal_length:
-    286
+    531
 
 FeatureSolver:
   ransac_prob:
@@ -36,9 +36,9 @@ FeatureSolver:
     rows: 3
     cols: 3
     dt: f
-    data: [525.2427570343234 ,    0.     ,  339.07352233962,
-            0.     ,  524.8957162605561,  227.6135227986774,
-            0.     ,    0.     ,    1.    ]
+    data: [531.14774,   0.     , 637.87114,
+          0.     , 531.26312, 331.27469,
+          0.     ,   0.     ,   1.     ]
 
 
 
