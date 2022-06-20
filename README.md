@@ -1,7 +1,4 @@
-# PythonMeshManipulation
-## Errors using dense interpolation written by my supervisor, Dr Paul Amayo
+# Tunable Reconstruction for MeshManipulation
 
-Finding errors in meshes made from dense depth maps. 
-
-Exploring using different techniques for feature selection. These features are then used to find the reconstruction error from the resulting sparse mesh.
-
+Implementing iterative tunable reconstruction based on the paper in https://people.csail.mit.edu/spillai/projects/fast-stereo-reconstruction/index.html
+This allows configuration of the density of the resulting mesh.
