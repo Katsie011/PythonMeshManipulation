@@ -10,11 +10,13 @@ import os
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tqdm
 import ModularFiles.HuskyDataHandler as husky
 import ModularFiles.ImgFeatureExtactorModule as ft
 
-sift = ft.FeatureDetector(det_type='sift', max_num_ft=500)
+sift = ft.FeatureDetector(det_type='sift', max_num_ft=2000)
+orb = ft.FeatureDetector(det_type='orb', max_num_ft=2000)
 pyvo = aru_py_vo.PyVO(
     '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/VOComparison/config/vo_config.yaml')
 
@@ -32,6 +34,16 @@ def get_vo(frame0, frame1, data, pyvo=pyvo):
     t0 = data.left_times[frame0].astype(np.int64)
 
     return pyvo.stereo_odometry(s0l, s0r, t0, s1l, s1r, t1)
+
+
+def get_vo_path(dataset):
+    transforms = np.zeros((dataset.num_frames - 1, 4, 4))
+
+    # for i in tqdm.trange(dataset.num_frames-1):
+    for i in tqdm.trange(500):
+        transforms[i] = get_vo(i, i + 1, dataset)
+
+    return generate_transform_path(transforms)
 
 
 def generate_transform_path(transforms: np.array):
@@ -88,9 +100,9 @@ def get_depth_predictions(predictions_directory, dataset):
     return pred_files, pred_times
 
 
-def depth_pred_vo(depth, img0, img1, K, det=sift, vo=pyvo):
-    kps0, des0 = det.detect(img0)
-    kps1, des1 = det.detect(img1)
+def depth_pred_vo(depth, img_f0, img_f1, K, det=orb, vo=pyvo):
+    kps0, des0 = det.detect(img_f0)
+    kps1, des1 = det.detect(img_f1)
 
     matches = det.get_matches(des0, des1)
 
@@ -102,8 +114,10 @@ def depth_pred_vo(depth, img0, img1, K, det=sift, vo=pyvo):
         query_idx.append(m.queryIdx)
 
     # Getting coordinates of the keypoints at the matches
-    u0, v0 = det.kp_to_pts(kps0)[train_idx].T
-    uv1 = det.kp_to_pts(kps1)[query_idx]
+    # print(f"Size K0 {len(kps0)}, train:{len(train_idx)}, max {np.max(train_idx)}")
+    # print(f"Size K1 {len(kps1)}, query:{len(query_idx)}, max {np.max(query_idx)}")
+    u0, v0 = det.kp_to_pts(kps0)[query_idx].T
+    uv1 = det.kp_to_pts(kps1)[train_idx]
 
     # Extracting camera parameters
     cx = K[0, 2]
@@ -112,8 +126,8 @@ def depth_pred_vo(depth, img0, img1, K, det=sift, vo=pyvo):
     fy = K[1, 1]
 
     # getting 3d points in frame 0
-    pt_u0 = np.floor(u0*depth.shape[1]/img0.shape[1]).astype(int)
-    pt_v0 = np.floor(v0*depth.shape[0]/img0.shape[0]).astype(int)
+    pt_u0 = np.floor(u0 * depth.shape[1] / img_f0.shape[1]).astype(int)
+    pt_v0 = np.floor(v0 * depth.shape[0] / img_f0.shape[0]).astype(int)
     x_cam = (u0 - cx) * depth[pt_v0, pt_u0] / fx
     y_cam = (v0 - cy) * depth[pt_v0, pt_u0] / fy
     z_cam = depth[pt_v0, pt_u0]
@@ -124,9 +138,26 @@ def depth_pred_vo(depth, img0, img1, K, det=sift, vo=pyvo):
 
     pts3d = np.stack((world_x, world_y, world_z), axis=1)
 
-
     # get VO estimation from 3d points in frame 0 and 2d pts in frame 1
-    return vo.motion_estimation(pts3d.T, uv1.T)
+    return vo.motion_estimation(pts3d, uv1)
+
+
+def get_depth_vo_path(output_directory, dataset):
+    depth_filenames, depth_times = get_depth_predictions(output_directory, dataset)
+
+    transforms = np.zeros((dataset.num_frames, 4, 4))
+
+    # for i in tqdm.trange(dataset.num_frames-1):
+    for i in tqdm.trange(500):
+        d = depth_filenames[i]
+        depth = cv2.imread(os.path.join(output_directory, d), cv2.IMREAD_GRAYSCALE)
+        im0 = dataset.get_cam0(i)
+        im1 = dataset.get_cam0(i + 1)
+        K = dataset.calib.cam0_camera_matrix
+
+        transforms[i] = depth_pred_vo(depth, img_f0=im0, img_f1=im1, K=K)
+
+    return generate_transform_path(transforms)
 
 
 if __name__ == "__main__":
@@ -134,27 +165,163 @@ if __name__ == "__main__":
     output_directory = os.path.join(data_dir, 'predictions/output/image_00/data')
     input_directory = os.path.join(data_dir, 'predictions/input/image_00/data')
     dataset = husky.DatasetHandler(data_dir)
-
-    # Trs = np.zeros((dataset.num_frames - 1, 4, 4))
-    #
-    # for i in tqdm.trange(dataset.num_frames - 1):
-    #     Trs[i] = get_vo(i, i + 1, dataset)
-    #
-    # x_stereo, y_stereo = generate_transform_path(Trs)
-    # plt.plot(x_stereo, y_stereo)
-    # plt.title("Stereo Visual Odometry results")
-    # plt.grid()
-    # plt.show()
-    #
-    # print("Done")
-
     depth_filenames, depth_times = get_depth_predictions(output_directory, dataset)
 
-    for i in range(dataset.num_frames):
+
+    # ---------------------
+    # ---------------------
+
+
+    video = False
+    plots = False
+    num_frames = len(depth_times)
+
+    # ---------------------
+    # ---------------------
+    # ---------------------
+    # ---------------------
+    # ---------------------
+    # ---------------------
+
+
+    if video:
+        video_output_directory = r"/home/kats/Videos/Masters/Depth_VO"
+        fps = 2
+        # out = cv2.VideoWriter(os.path.join(video_output_directory,'outpy.mp4'), cv2.VideoWriter_fourcc(*'mp4v'), fps, (1500, 700))
+        out = cv2.VideoWriter(os.path.join(video_output_directory, 'out_orb_2000fts.mp4'),
+                              cv2.VideoWriter_fourcc(*'mp4v'), fps, (1500, 700))
+
+    x_vo, y_vo = [], []
+    x_p, y_p = [], []
+    coords_p = np.eye(4)
+    coords_vo = np.eye(4)
+    K = dataset.calib.cam0_camera_matrix
+
+    # x_p, y_p = get_depth_vo_path(output_directory, dataset)
+    # x_vo, y_vo = get_vo_path(dataset)
+
+
+    t_p = np.zeros((num_frames, 4, 4))
+    t_vo = np.zeros((num_frames, 4, 4))
+    # for i in tqdm.trange(len(depth_times)-1):
+    for i in tqdm.trange(num_frames):
+        if plots: fig_pred, axp = plt.subplots(2, 2, figsize=(15, 7))
+        # Show current image, future image and depth
+
+        # Get transform
         d = depth_filenames[i]
         depth = cv2.imread(os.path.join(output_directory, d), cv2.IMREAD_GRAYSCALE)
         im0 = dataset.get_cam0(i)
-        im1 = dataset.get_cam1(i)
-        K = dataset.calib.cam0_camera_matrix
+        im1 = dataset.get_cam0(i + 1)
+        t_p[i] = depth_pred_vo(depth, img_f0=im0, img_f1=im1, K=K)
 
-        print(depth_pred_vo(depth, im0, im1, K))
+        t_vo[i] = get_vo(i, i + 1, dataset)
+
+        # Get new coordinate and update map
+
+        coords_p = coords_p @ t_p[i]
+        x_p.append(-coords_p[2][3])
+        y_p.append(coords_p[0][3])
+
+        coords_vo = coords_vo @ t_vo[i]
+        x_vo.append(coords_vo[2][3])
+        y_vo.append(-coords_vo[0][3])
+
+        # Making the plots
+        if plots:
+            axp[0, 0].imshow(cv2.cvtColor(im0, cv2.COLOR_BGR2RGB))
+            axp[0, 0].set_title(f"Image at frame{i}")
+            axp[0, 0].axis('off')
+
+            # axp[0, 1].imshow(im1)
+            # axp[0, 1].set_title(f"Image at frame{i+1}")
+            # axp[0, 1].axis('off')
+            #
+            # sc = axp[1, 0].imshow(depth, 'jet')
+            # axp[1, 0].set_title(f" Predicted depth at frame{i}")
+            # axp[1, 0].axis('off')
+            # divider = make_axes_locatable(axp[1, 0])
+            # cax = divider.append_axes("right", size="5%", pad=0.05)
+            # cb = plt.colorbar(sc, cax=cax)
+            # cb.set_label("Depth [m]")
+
+            sc = axp[0, 1].imshow(depth, 'jet')
+            axp[0, 1].set_title(f" Predicted depth at frame{i}")
+            axp[0, 1].axis('off')
+            divider = make_axes_locatable(axp[0, 1])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cb = plt.colorbar(sc, cax=cax)
+            cb.set_label("Depth [m]")
+
+            es = t_p[:i + 1] - t_vo[:i + 1]
+            axp[1, 0].plot((es ** 2).mean(axis=-1).mean(axis=-1))
+            axp[1, 0].set_title("MSE between VO and predicted depth VO transforms")
+
+            axp[1, 1].plot(x_p, y_p, label='Depth Pred Transforms')
+            axp[1, 1].plot(x_vo, y_vo, label='VO Transforms')
+            axp[1, 1].legend()
+            axp[1, 1].axis('equal')
+            axp[1, 1].set_xlabel('x[m]')
+            axp[1, 1].set_ylabel('y[m]')
+
+            # plt.show()
+            fig_pred.canvas.draw()
+            canv = np.fromstring(fig_pred.canvas.tostring_rgb(), dtype=np.uint8,
+                                 sep='')
+            canv = canv.reshape(fig_pred.canvas.get_width_height()[::-1] + (3,))
+            canv = cv2.cvtColor(canv, cv2.COLOR_RGB2BGR)
+            cv2.imshow('VO Plots', canv)
+            cv2.waitKey(1)
+
+            if video: out.write(canv)
+            plt.close('all')
+
+    if video: out.release()
+
+    plt.plot(x_p, y_p, label='Depth Pred Transforms')
+    plt.plot(x_vo, y_vo, label='VO Transforms')
+    plt.legend()
+    plt.axis('equal')
+    plt.xlabel('x[m]')
+    plt.ylabel('y[m]')
+    plt.show()
+
+    plt.plot(x_p, label='PD-VO x')
+    plt.plot(y_p, label='PD-VO y')
+    plt.plot(x_vo, label='VO x')
+    plt.plot(y_vo, label='VO y')
+    plt.legend()
+    plt.axis('equal')
+    plt.xlabel('x[m]')
+    plt.ylabel('y[m]')
+    plt.show()
+
+    # c_p = np.eye(4)@t_p[0]
+    # c_v = np.eye(4)@t_vo[0]
+    # xp = -c_p[2][3]
+    # yp = c_p[0][3]
+    # zp = -c_p[1][3]
+    # xv = -c_v[2][3]
+    # yv = c_v[0][3]
+    # zv = -c_v[1][3]
+    # valuesp = [xp, yp, zp]
+    # valuess = [xv, yv, zv]
+    # names = ['x', 'y', 'z']
+    # x = np.arange(len(names))
+    # plt.bar(x - 0.2, valuesp, 0.4, label='Predicted vo')
+    # plt.bar(x + 0.2, valuess, 0.4, label='stereo vo')
+    # plt.xticks(x, names)
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
+
+    # TODO check depth and not disparity
+
+    # TODO Curvature features instead of sift
+    # TODO Check what features are being used by network
+
+    # TODO update datahandler to also read prdictions if possible
+
+    # TODO live prediction VO
+    #     - multi thread?
+    #       - How to pass depths from one thread to another? Call the process from depth pred?
