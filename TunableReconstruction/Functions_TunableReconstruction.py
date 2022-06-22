@@ -6,7 +6,8 @@ from matplotlib import cm
 import sys
 # from scipy.spatial import Delaunay
 from scipy.spatial.distance import hamming
-from mesh_pydnet.HyperParameters import *
+import numpy as np
+from reconstruction.HyperParameters import *
 
 
 

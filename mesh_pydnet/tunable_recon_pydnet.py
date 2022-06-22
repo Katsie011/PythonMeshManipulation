@@ -5,14 +5,15 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 from scipy.spatial import Delaunay
+import tensorflow as tf
 # import tensorflow.compat.v1 as tf
 import argparse
 
-from mesh_pydnet.HyperParameters import *
-import TunableReconstruction.Functions_TunableReconstruction as TR_func
-import ModularFiles.ImgFeatureExtactorModule as feat
-import ModularFiles.HuskyDataHandler as husky
-import TunableReconstruction.ErrorEvaluationImgs as ee
+from reconstruction.HyperParameters import *
+import reconstruction.TunableReconstruction.Functions_TunableReconstruction as TR_func
+import reconstruction.ModularFiles.ImgFeatureExtactorModule as feat
+import reconstruction.ModularFiles.HuskyDataHandler as husky
+import reconstruction.TunableReconstruction.ErrorEvaluationImgs as ee
 
 from pydnet.utils import *
 from pydnet.pydnet import *
@@ -68,15 +69,6 @@ def get_dataset():
         print("Using Husky data")
         return husky.DatasetHandler(data_dir)
 
-    # elif args.dataset.lower() == 'kitti':
-    #     print("Overriding and using Kitti Data")
-    #     files = pd.DataFrame(data=np.array((data.cam2_files, data.cam3_files)).reshape((-1, 2)),
-    #                          columns=['left', 'right'])
-    #     files = files.sample(100).reset_index()
-    #
-    # else:
-    #     raise "Invalid argument for dataset"
-    # return files
 
 
 def init_pydepth():
