@@ -9,11 +9,11 @@
 
 import sys
 
-import HuskyCalib as HuskyCalib
+import reconstruction.HuskyCalib as HuskyCalib
 
 if "aru_core_lib" not in sys.modules:
     # you may need a symbolic link to the build of aru_core library
-    import aru_core_lib.aru_py_mesh as aru_py_mesh
+    import reconstruction.aru_core_lib.aru_py_mesh as aru_py_mesh
 
 CWD = "/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation"
 config_path = "/home/kats/Code/PythonMeshManipulation/TunableReconstruction/mesh_depth.yaml"
