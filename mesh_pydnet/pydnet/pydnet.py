@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from mesh_pydnet.pydnet.layers import *
+from reconstruction.mesh_pydnet.pydnet.layers import *
 
 class pydnet(object):
 

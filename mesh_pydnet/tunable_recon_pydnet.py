@@ -12,7 +12,7 @@ import argparse
 from reconstruction.HyperParameters import *
 import reconstruction.TunableReconstruction.Functions_TunableReconstruction as TR_func
 import reconstruction.ModularFiles.ImgFeatureExtactorModule as feat
-import reconstruction.ModularFiles.HuskyDataHandler as husky
+import utilities.datahandling.HuskyDataHandler as husky
 import reconstruction.TunableReconstruction.ErrorEvaluationImgs as ee
 
 from pydnet.utils import *

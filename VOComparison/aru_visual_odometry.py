@@ -12,7 +12,7 @@ import cv2
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tqdm
-import reconstruction.ModularFiles.HuskyDataHandler as husky
+import utilities.HuskyDataHandler as husky
 import reconstruction.ModularFiles.ImgFeatureExtactorModule as ft
 import reconstruction.ModularFiles.MaximumOfCutvatureFeature as moc
 

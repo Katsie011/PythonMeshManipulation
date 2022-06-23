@@ -18,7 +18,7 @@ Options:
 # ----------------------------------------------------------------------------
 import matplotlib.pyplot as plt
 import sys
-from PythonMeshManipulation.mesh_pydnet.HyperParameters import *
+from reconstruction.HyperParameters import *
 
 
 
