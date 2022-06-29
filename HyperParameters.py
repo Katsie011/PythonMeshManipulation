@@ -26,7 +26,8 @@ depth_est = aru_py_mesh.PyDepth(config_path)
 
 NUM_INITIAL_FEATURES = 200
 LOWE_DISTANCE_RATIO = 0.8
-MAX_DISTANCE = 100  # meters  This is 4px disparity
+MAX_DISTANCE = 60  # meters
+MAX_DISPARITY = 0.5
 MAX_NUM_FEATURES_DETECT = 2000
 MIN_DISTANCE = 2
 TRIANGLE_SAMPLES_PER_PIX_SQUARED = 1 / 10 ** 2
@@ -38,10 +39,3 @@ RESAMPLING_ITERATIONS = 3
 
 IMAGE_SHAPE = (720, 1280, 3)
 PREDICTION_SHAPE = (384, 640)
-
-ZED_t = HuskyCalib.t_cam0_velo
-ZED_R = HuskyCalib.R_rect_cam0
-
-t = ZED_t
-K = HuskyCalib.left_camera_matrix
-R = ZED_R
