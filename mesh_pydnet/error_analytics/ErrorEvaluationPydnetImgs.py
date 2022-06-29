@@ -25,7 +25,6 @@ import cv2
 from reconstruction.HyperParameters import *
 import reconstruction.TunableReconstruction.Functions_TunableReconstruction as TR_func
 import utilities.HuskyDataHandler as husky
-import reconstruction.TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
 
 
 # ----------------------------------------------------------------------------
@@ -87,7 +86,7 @@ def lidar_to_img_frame(pts, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_
 
 
 def render_lidar(pts, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_matrix, img_shape=IMAGE_SHAPE,
-                 render_shape=PREDICTION_SHAPE, mask=True):
+                 render_shape=None, mask=True):
     '''Project 3D points into 2D image. Expects pts3d as a 4xN
        numpy array. Returns the 2D projection of the points that
        are in front of the camera only an the corresponding 3D points.'''
@@ -95,8 +94,11 @@ def render_lidar(pts, Tr=HuskyCalib.T_cam0_vel0, K=HuskyCalib.left_camera_matrix
     if len(img_shape) == 3:
         img_shape = img_shape[:2]
 
-    if len(render_shape) == 3:
-        render_shape = render_shape[:2]
+    if render_shape is not None:
+        if len(render_shape) == 3:
+            render_shape = render_shape[:2]
+    else:
+        render_shape = img_shape
 
     # u, v, d = lidar_to_img_frame(pts, Tr, K, img_shape=img_shape)
     u, v, d = pts.T
@@ -252,6 +254,8 @@ if __name__ == "__main__":
     import pandas as pd
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+    import reconstruction.TunableReconstruction.IterativeTunableReconstructionPipeline as ITR
+
     # Data path locations:
 
     data_dir = r"/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route C"
@@ -325,10 +329,8 @@ if __name__ == "__main__":
 
 
         """
-        # velo = dataset.get_lidar(frame)
+
         velo = dataset.get_lidar(i)
-        # img = cv2.cvtColor(dataset.get_cam0(frame), cv2.COLOR_BRG2RGB)
-        # img = dataset.get_cam0(frame)
         img = dataset.get_cam0(i)
 
         u, v, gt_depth = lidar_to_img_frame(velo, HuskyCalib.T_cam0_vel0, dataset.left_camera_matrix,
