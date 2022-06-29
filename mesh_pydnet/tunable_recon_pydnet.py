@@ -5,13 +5,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 from scipy.spatial import Delaunay
-import tensorflow as tf
 # import tensorflow.compat.v1 as tf
 import argparse
 
 from reconstruction.HyperParameters import *
 import reconstruction.TunableReconstruction.Functions_TunableReconstruction as TR_func
-import reconstruction.ModularFiles.ImgFeatureExtactorModule as feat
+import utilities.ImgFeatureExtactorModule as feat
 import utilities.datahandling.HuskyDataHandler as husky
 import reconstruction.TunableReconstruction.ErrorEvaluationImgs as ee
 
