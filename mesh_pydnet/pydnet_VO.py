@@ -80,14 +80,25 @@ def get_errors(pred_disp_img, dataset, frame, pt_list, title_list, mse=True, plo
     raise NotImplementedError
 
 
-def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)):
+def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512), max_frames=None, get_orb=True,
+                    get_sift=True):
     # dataset = get_dataset(dataset_dir)
 
-    sift_coords = np.eye(4)
-    orb_coords = np.eye(4)
+    if not get_orb and not get_sift:
+        print("No feature detector chosen. Returning None")
+        return None
 
-    x_sift, y_sift = np.zeros(dataset.num_frames), np.zeros(dataset.num_frames)
-    x_orb, y_orb = np.zeros(dataset.num_frames), np.zeros(dataset.num_frames)
+    if get_sift:
+        sift_coords = np.eye(4)
+    if get_orb:
+        orb_coords = np.eye(4)
+
+    if max_frames is None:
+        max_frames = dataset.num_frames - 1
+    if get_sift:
+        x_sift, y_sift = np.zeros(max_frames), np.zeros(max_frames)
+    if get_orb:
+        x_orb, y_orb = np.zeros(max_frames), np.zeros(max_frames)
 
     input_shape = dataset.img_shape
     full_width = int(128 * (input_shape[1] // 128))
@@ -156,7 +167,9 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
             sess.run(init)
             loader.restore(sess, args.checkpoint_dir)
 
-            for counter in tqdm.trange(dataset.num_frames):
+            for counter in tqdm.trange(max_frames):
+                # for counter in tqdm.trange(dataset.num_frames):
+                start_loop_time = time.time()
                 imgl = cv2.cvtColor(dataset.get_cam0(counter), cv2.COLOR_BGR2RGB)
 
                 img = cv2.resize(imgl, (train_width, train_height)).astype(np.float32) / 255.
@@ -170,7 +183,7 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                 disparity = disp[0, :, :, 0].squeeze() * 0.3 * train_width
                 # disparity[disparity<MAX_DISPARITY] = MAX_DISPARITY
                 depth = dataset.calib.baseline[0] * (
-                            dataset.calib.cam0_camera_matrix[0, 0] * train_width / input_shape[1]) / disparity
+                        dataset.calib.cam0_camera_matrix[0, 0] * train_width / input_shape[1]) / disparity
                 depth[depth > MAX_DISTANCE] = MAX_DISTANCE
                 fullsize_depth = cv2.resize(depth, (full_width, full_height))
                 if verbose: print(f"Time to predict image of size {training_size}: {time_pred}")
@@ -178,26 +191,43 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                 ########################################################################################################
                 #                                           Getting the VO                                             #
                 ########################################################################################################
+                if get_orb:
+                    orb_transform = vocomp.predicted_depth_motion_est(depth_f0=fullsize_depth, img_f0=imgl,
+                                                                      img_f1=cv2.cvtColor(dataset.get_cam0(counter + 1),
+                                                                                          cv2.COLOR_BGR2RGB),
+                                                                      K=dataset.calib.cam0_camera_matrix, det=orb)
 
-                orb_transform = vocomp.predicted_depth_motion_est(depth_f0=fullsize_depth, img_f0=imgl,
-                                                                  img_f1=cv2.cvtColor(dataset.get_cam0(counter + 1),
-                                                                                      cv2.COLOR_BGR2RGB),
-                                                                  det=orb)
+                    if orb_transform is not None:
+                        orb_coords = orb_coords @ orb_transform
+                        x_orb[counter] = -orb_coords[2][3]
+                        y_orb[counter] = orb_coords[0][3]
+                    else:
+                        print(f"None returned using ORB for depth VO in frame {counter}")
 
-                sift_transform = vocomp.predicted_depth_motion_est(depth_f0=fullsize_depth, img_f0=imgl,
-                                                                   img_f1=cv2.cvtColor(dataset.get_cam0(counter + 1),
-                                                                                       cv2.COLOR_BGR2RGB),
-                                                                   det=sift)
+                if get_sift:
+                    sift_transform = vocomp.predicted_depth_motion_est(depth_f0=fullsize_depth, img_f0=imgl,
+                                                                       img_f1=cv2.cvtColor(
+                                                                           dataset.get_cam0(counter + 1),
+                                                                           cv2.COLOR_BGR2RGB),
+                                                                       K=dataset.calib.cam0_camera_matrix, det=sift)
+                    if sift_transform is not None:
+                        sift_coords = sift_coords @ sift_transform
+                        x_sift[counter] = -sift_coords[2][3]
+                        y_sift[counter] = sift_coords[0][3]
+                    else:
+                        print(f"None returned using SIFT for depth VO in frame {counter}")
 
-                sift_coords = sift_coords @ sift_transform
-                x_sift[counter] = -sift_coords[2][3]
-                y_sift[counter] = sift_coords[0][3]
+                end_loop_time = time.time()
+                print(
+                    f"\nTook {end_loop_time - start_loop_time:.3f}s to run one iteration with SIFT and ORB VO together")
 
-                orb_coords = orb_coords @ orb_transform
-                x_orb[counter] = -orb_coords[2][3]
-                y_orb[counter] = orb_coords[0][3]
-
-    return [x_orb, y_orb], [x_sift, y_sift]
+    # Returning points
+    if get_sift and get_orb:
+        return [x_orb, y_orb], [x_sift, y_sift]
+    elif get_sift and not get_orb:
+        return [x_sift, y_sift]
+    elif get_orb:
+        return [y_orb, y_orb]
 
 
 if __name__ == "__main__":
@@ -208,8 +238,21 @@ if __name__ == "__main__":
     #       "/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route B/2022_05_04_09_38_30"]
 
     data_dir = "/home/kats/Datasets/Route A/2022_05_03_13_53_38"
-    dataset_obj = husky.DatasetHandler(data_dir, time_sync=False)
+    dataset_obj = husky.DatasetHandler(data_dir, time_tolerance=0.5)
     print(f"Predicting for bag:\n{data_dir}")
+    num_frames = None
 
-    [x_o, y_o], [x_s, y_s] = predict_dataset(dataset=dataset_obj, save_fig=True, plots=False)
-    x_vo, y_vo = vocomp.get_vo_path(dataset=dataset_obj)
+    [x_o, y_o], [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=False, max_frames=num_frames)
+    x_vo, y_vo = vocomp.get_vo_path_on_dataset(dataset=dataset_obj, stop_frame=num_frames)
+
+    print("Plotting")
+    import matplotlib.pyplot as plt
+    import utilities.plotting_utils as VO_plt
+
+    fig, ax = plt.subplots()
+    VO_plt.plot_vo_path_with_arrows(axis=ax, x=x_o, y=-y_o, linestyle='o--', label="Pydnet ORB VO")
+    VO_plt.plot_vo_path_with_arrows(axis=ax, x=x_s, y=-y_s, linestyle='o--', label="Pydnet SIFT VO")
+    VO_plt.plot_vo_path_with_arrows(axis=ax, x=x_vo, y=y_vo, linestyle='o--', label="Stereo VO")
+    ax.legend()
+
+    plt.show()
