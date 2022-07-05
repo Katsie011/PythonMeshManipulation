@@ -23,8 +23,8 @@ import utilities.Image as img_utils
 # Temp:
 import utilities.image_similarity as im_sim
 
-sift = ft.FeatureDetector(det_type='sift', max_num_ft=1000)
-orb = ft.FeatureDetector(det_type='orb', max_num_ft=1000)
+sift = ft.FeatureDetector(det_type='sift', max_num_ft=2000)
+orb = ft.FeatureDetector(det_type='orb', max_num_ft=2000)
 pyvo = aru_py_vo.PyVO(
     '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/VOComparison/config/vo_config.yaml')
 
@@ -75,7 +75,7 @@ def generate_transform_path(transforms: np.array, validate: bool = False, max_d=
     x_vals = []
     y_vals = []
 
-    print(f"Number of transforms with a nan or none:  {np.sum(np.isnan(transforms).sum(axis=-1).sum(axis=-1) > 0)}")
+    print(f"Number of transforms with a nan or None:  {np.sum(np.isnan(transforms).sum(axis=-1).sum(axis=-1) > 0)}")
     for rt in transforms:
         if np.sum(np.isnan(rt)) == 0:
             if validate:
@@ -269,9 +269,12 @@ def get_vo_path_on_dataset(dataset, start_frame=None, stop_frame=None, validate=
     return generate_transform_path(transforms, validate=validate)
 
 
-def vo_on_bag(bag, max_d_per_step=2, camera_config_path: str=None,
+def vo_on_bag(bag: rosbag.Bag, max_d_per_step: int=2, camera_config_path: str=None,
               stereo_topic="/camera/image_stereo/image_raw", left_topic='/camera/image_left/image_raw',
               right_topic='/camera/image_right/image_raw'):
+    """
+    Given a rosbag bag, runs VO on the bag and returns the path in global x and y [m]
+    """
     if camera_config_path is None:
         stereo_cam_params = img_utils.StereoCamParams()
     else:
