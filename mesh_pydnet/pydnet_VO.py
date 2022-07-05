@@ -3,8 +3,8 @@ Online VO using Pydnet network
 """
 import time
 import tqdm
-# import matplotlib.pyplot as plt
-# from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 # from scipy.spatial import Delaunay
 import tensorflow as tf
@@ -19,8 +19,8 @@ import utilities.ImgFeatureExtactorModule as ft
 from pydnet.utils import *
 from pydnet.pydnet import *
 
-sift = ft.FeatureDetector(det_type='sift', max_num_ft=500)
-orb = ft.FeatureDetector(det_type='orb', max_num_ft=500)
+sift = ft.FeatureDetector(det_type='sift', max_num_ft=2000)
+orb = ft.FeatureDetector(det_type='orb', max_num_ft=2000)
 
 parser = argparse.ArgumentParser(description='Argument parser')
 
@@ -121,43 +121,25 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
     # if plots:
     #     plt.ion()
     #
-    #     fig, [[ax_l, ax_r], [ax_dis, ax_dep]] = plt.subplots(2, 2, figsize=(24, 14))
+    #     fig, [[ax_l, ax_r], [ax_kps0, ax_kps1]] = plt.subplots(2, 2, figsize=(24, 14))
     #     fig.tight_layout(pad=5)
-    #
     #     l_title = ax_l.set_title("input image")
+    #     plt_input_img = ax_l.imshow(np.zeros(input_shape))
     #     ax_l.axis('off')
     #     r_title = ax_r.set_title("output inferred map")
+    #     plt_onput_img = ax_r.imshow(np.zeros(input_shape), 'jet')
     #     ax_r.axis('off')
+    #     kps0_img = ax_kps0.imshow(np.zeros(input_shape))
+    #     ax_kps0.set_title("Keypoints on frame n")
+    #     ax_kps0.axis('off')
+    #     kps1_img = ax_kps1.imshow(np.zeros(input_shape))
+    #     ax_kps1.set_title("Keypoints on frame n+1")
+    #     ax_kps1.axis('off')
     #
-    #     dis_title = ax_dis.set_title("inv_depth = inferred x 0.3 x width")
-    #     ax_l.axis('off')
-    #     dep_title = ax_dep.set_title("depth = (b x f)/inv_depth")
-    #     ax_r.axis('off')
-    #
-    #     cm = 'jet' # setting color map
-    #     # cm = 'plasma' # setting color map
-    #
-    #
-    #     plot_iml = ax_l.imshow(np.zeros((train_height, train_width), dtype=np.uint8))
-    #     plot_imp = ax_r.imshow(np.zeros((train_height, train_width), dtype=np.uint8))
-    #
-    #     plot_disp = ax_dis.imshow(np.zeros((train_height, train_width), dtype=np.uint8))
-    #     plot_depth = ax_dep.imshow(np.zeros((train_height, train_width), dtype=np.uint8))
-    #
-    #     divider = make_axes_locatable(ax_r)
-    #     cax = divider.append_axes("right", size="5%", pad=0.05)
-    #     cb_imp = plt.colorbar(plot_disp, cax=cax)
-    #     cb_imp.set_label("Disparity [px]")
-    #
-    #     divider = make_axes_locatable(ax_dis)
-    #     cax = divider.append_axes("right", size="5%", pad=0.05)
-    #     cb_disp = plt.colorbar(plot_disp, cax=cax)
-    #     cb_disp.set_label("Disparity [px]")
-    #
-    #     divider = make_axes_locatable(ax_dep)
-    #     cax = divider.append_axes("right", size="5%", pad=0.05)
-    #     cb_depth = plt.colorbar(plot_disp, cax=cax)
-    #     cb_depth.set_label("Depth [m]")
+    #     # plt.show()
+
+
+
 
     with tf.Graph().as_default():
         placeholders, model, init, loader, saver = init_pydepth()
@@ -182,20 +164,37 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                 time_pred = start_pred - end_pred
                 disparity = disp[0, :, :, 0].squeeze() * 0.3 * train_width
                 # disparity[disparity<MAX_DISPARITY] = MAX_DISPARITY
-                depth = dataset.calib.baseline[0] * (
-                        dataset.calib.cam0_camera_matrix[0, 0] * train_width / input_shape[1]) / disparity
+                depth = dataset.calib.baseline[0] * (dataset.calib.cam0_camera_matrix[0, 0] * train_width / input_shape[1]) / disparity
                 depth[depth > MAX_DISTANCE] = MAX_DISTANCE
                 fullsize_depth = cv2.resize(depth, (full_width, full_height))
                 if verbose: print(f"Time to predict image of size {training_size}: {time_pred}")
 
+                # if plots:
+                #     plt_input_img.set_data(imgl)
+                #     l_title.set_text(f"Input image for frame {counter}")
+                #     plt_onput_img.set_data(fullsize_depth)
+                #     r_title.set_text(f"Fullsize Depth prediction frame {counter}")
+
                 ########################################################################################################
                 #                                           Getting the VO                                             #
                 ########################################################################################################
+                imgl_p1 = cv2.cvtColor(dataset.get_cam0(counter + 1), cv2.COLOR_BGR2RGB)
                 if get_orb:
                     orb_transform = vocomp.predicted_depth_motion_est(depth_f0=fullsize_depth, img_f0=imgl,
-                                                                      img_f1=cv2.cvtColor(dataset.get_cam0(counter + 1),
-                                                                                          cv2.COLOR_BGR2RGB),
+                                                                      img_f1=imgl_p1,
                                                                       K=dataset.calib.cam0_camera_matrix, det=orb)
+                    if plots:
+                        kps0, des0 = orb.detect(imgl)
+                        kps1, des1 = orb.detect(imgl_p1)
+                        matches = orb.get_matches(des0, des1, lowes_ratio=0.7)
+                        # kps0_img.set_data(cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
+                        # kps1_img.set_data(cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
+                        img_kps0= cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+                        img_kps1= cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+
+                        cv2.imshow("ORBKeypointsImg", cv2.resize(np.hstack((img_kps0, img_kps1)), (full_width, full_height//2)))
+
+
 
                     if orb_transform is not None:
                         orb_coords = orb_coords @ orb_transform
@@ -206,10 +205,21 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
 
                 if get_sift:
                     sift_transform = vocomp.predicted_depth_motion_est(depth_f0=fullsize_depth, img_f0=imgl,
-                                                                       img_f1=cv2.cvtColor(
-                                                                           dataset.get_cam0(counter + 1),
-                                                                           cv2.COLOR_BGR2RGB),
+                                                                       img_f1=imgl_p1,
                                                                        K=dataset.calib.cam0_camera_matrix, det=sift)
+
+                    if plots:
+                        kps0, des0 = sift.detect(imgl)
+                        kps1, des1 = sift.detect(imgl_p1)
+                        matches = sift.get_matches(des0, des1, lowes_ratio=0.7)
+                        # kps0_img.set_data(cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
+                        # kps1_img.set_data(cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
+                        img_kps0 = cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0), flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+                        img_kps1 = cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+
+                        cv2.imshow("SIFTKeypointsImg",
+                                   cv2.resize(np.hstack((img_kps0, img_kps1)), (full_width, full_height // 2)))
+
                     if sift_transform is not None:
                         sift_coords = sift_coords @ sift_transform
                         x_sift[counter] = -sift_coords[2][3]
@@ -220,6 +230,9 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                 end_loop_time = time.time()
                 print(
                     f"\nTook {end_loop_time - start_loop_time:.3f}s to run one iteration with SIFT and ORB VO together")
+
+                if plots:
+                    cv2.waitKey(20)
 
     # Returning points
     if get_sift and get_orb:
@@ -237,12 +250,14 @@ if __name__ == "__main__":
     #       "/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route A/2022_05_03_13_53_38",
     #       "/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route B/2022_05_04_09_38_30"]
 
-    data_dir = "/home/kats/Datasets/Route A/2022_05_03_13_53_38"
+    data_dir = "/home/kats/Datasets/Whitelab/Dataset_Structures/2022_07_04_10_26_41"
     dataset_obj = husky.DatasetHandler(data_dir, time_tolerance=0.5)
     print(f"Predicting for bag:\n{data_dir}")
     num_frames = None
 
-    [x_o, y_o], [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=False, max_frames=num_frames)
+    [x_o, y_o], [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=True, max_frames=num_frames)
+    # [x_o, y_o] = predict_dataset(dataset=dataset_obj, plots=False, max_frames=num_frames, get_orb=True, get_sift=False)
+    # [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=True, max_frames=num_frames, get_orb=False, get_sift=True)
     x_vo, y_vo = vocomp.get_vo_path_on_dataset(dataset=dataset_obj, stop_frame=num_frames)
 
     print("Plotting")
