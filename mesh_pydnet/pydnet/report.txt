@@ -1,0 +1,24 @@
+TensorFlow 2.0 Upgrade Script
+-----------------------------
+Converted 1 files
+Detected 0 issues that require attention
+--------------------------------------------------------------------------------
+================================================================================
+Detailed log follows:
+
+================================================================================
+--------------------------------------------------------------------------------
+Processing file 'webcam.py'
+ outputting to 'webcam2.py'
+--------------------------------------------------------------------------------
+
+52:26: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+54:9: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
+57:20: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
+58:19: INFO: Renamed 'tf.local_variables_initializer' to 'tf.compat.v1.local_variables_initializer'
+60:13: INFO: Renamed 'tf.train.Saver' to 'tf.compat.v1.train.Saver'
+61:12: INFO: Renamed 'tf.train.Saver' to 'tf.compat.v1.train.Saver'
+64:9: INFO: Renamed 'tf.Session' to 'tf.compat.v1.Session'
+96:4: INFO: Renamed 'tf.app.run' to 'tf.compat.v1.app.run'
+--------------------------------------------------------------------------------
+

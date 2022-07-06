@@ -15,7 +15,7 @@ import sys
 
 if "aru_core_lib" not in sys.modules:
     # you may need a symbolic link to the build of aru_core library
-    import aru_core_lib.aru_py_mesh as aru_py_mesh
+    import reconstruction.aru_core_lib.aru_py_mesh as aru_py_mesh
 
 import os
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -25,12 +25,12 @@ import matplotlib.pyplot as plt
 import cv2
 
 # You may need to use symlinks to pull the corresponding repos into the correct places.
-import TunableReconstruction.Functions_TunableReconstruction as TR_func
+import reconstruction.TunableReconstruction.Functions_TunableReconstruction as TR_func
 
 # -----------------------------------------------------------------------------------------------------------------
 #       Declaring Hyperparameters
 # -----------------------------------------------------------------------------------------------------------------
-from mesh_pydnet.HyperParameters import *
+from reconstruction.HyperParameters import *
 
 
 # -----------------------------------------------------------------------------------------------------------------

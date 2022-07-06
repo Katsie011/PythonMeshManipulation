@@ -36,7 +36,7 @@ def make_train_test_lists(data_dir, test_dir, training_dir, make_test=True, make
     for fnum, f in enumerate(folders):
         print(f"\nOn folder number {fnum} of {len(folders)}\n"
               f"--------------------------------------------------------")
-        husky_data = husky.Dataset_Handler(data_path=os.path.join(data_dir, f))
+        husky_data = husky.DatasetHandler(data_path=os.path.join(data_dir, f))
         print(f"Number of time synced frames is: {husky_data.num_frames}")
         flag_train = True
         flag_test = True

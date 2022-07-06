@@ -1,0 +1,6 @@
+[submodule "aru-calibration"]
+	path = aru-calibration
+	url = https://github.com/African-Robotics-Unit/aru-calibration.git
+[submodule "mesh_pydnet/ModularFiles"]
+	path = mesh_pydnet/ModularFiles
+	url = https://github.com/Katsie011/python-modular-files-aru-core.git
