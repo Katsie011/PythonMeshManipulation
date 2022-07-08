@@ -18,9 +18,9 @@ import utilities.ImgFeatureExtactorModule as ft
 
 import sys
 
-sys.path.append("/home/kats/Code/aru_sil_py/reconstruction/mesh_pydnet/pydnet")
-from utils import *
-from pydnet import *
+# sys.path.append("/home/kats/Code/aru_sil_py/reconstruction/mesh_pydnet/pydnet")
+from reconstruction.mesh_pydnet.pydnet.utils import *
+from reconstruction.mesh_pydnet.pydnet.pydnet import *
 
 sift = ft.FeatureDetector(det_type='sift', max_num_ft=2000)
 orb = ft.FeatureDetector(det_type='orb', max_num_ft=2000)
@@ -193,9 +193,9 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                         # kps0_img.set_data(cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
                         # kps1_img.set_data(cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
                         img_kps0= cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
-                        img_kps1= cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+                        # img_kps1= cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
 
-                        cv2.imshow("ORBKeypointsImg", cv2.resize(np.hstack((img_kps0, img_kps1)), (full_width, full_height//2)))
+                        # cv2.imshow("ORBKeypointsImg", cv2.resize(np.hstack((img_kps0, img_kps1)), (full_width, full_height//2)))
 
 
 
@@ -218,10 +218,10 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                         # kps0_img.set_data(cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
                         # kps1_img.set_data(cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
                         img_kps0 = cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0), flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
-                        img_kps1 = cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+                        # img_kps1 = cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
 
-                        cv2.imshow("SIFTKeypointsImg",
-                                   cv2.resize(np.hstack((img_kps0, img_kps1)), (full_width, full_height // 2)))
+                        # cv2.imshow("SIFTKeypointsImg",
+                        #            cv2.resize(np.hstack((img_kps0, img_kps1)), (full_width, full_height // 2)))
 
                     if sift_transform is not None:
                         sift_coords = sift_coords @ sift_transform
@@ -235,6 +235,14 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                     f"\nTook {end_loop_time - start_loop_time:.3f}s to run one iteration with SIFT and ORB VO together")
 
                 if plots:
+
+                    if get_sift:
+                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(img_kps0, disparity.shape[::-1]), cv2.COLOR_RGB2BGR), cv2.applyColorMap(
+                        (disparity*255/disparity.max()).astype(np.uint8),cv2.COLORMAP_INFERNO)))
+                    else:
+                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(img_kps0, disparity.shape[::-1]), cv2.COLOR_RGB2BGR), cv2.applyColorMap(
+                        (disparity*255/disparity.max()).astype(np.uint8),cv2.COLORMAP_INFERNO)))
+                    cv2.imshow("Input and disparity", img_and_depth)
                     cv2.waitKey(20)
 
     # Returning points
@@ -258,9 +266,9 @@ if __name__ == "__main__":
     print(f"Predicting for bag:\n{data_dir}")
     num_frames = None
 
-    [x_o, y_o], [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=True, max_frames=num_frames)
+    # [x_o, y_o], [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=True, max_frames=num_frames)
     # [x_o, y_o] = predict_dataset(dataset=dataset_obj, plots=False, max_frames=num_frames, get_orb=True, get_sift=False)
-    # [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=True, max_frames=num_frames, get_orb=False, get_sift=True)
+    [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=True, max_frames=num_frames, get_orb=False, get_sift=True)
     x_vo, y_vo = vocomp.get_vo_path_on_dataset(dataset=dataset_obj, stop_frame=num_frames)
 
     print("Plotting")
@@ -268,7 +276,7 @@ if __name__ == "__main__":
     import utilities.plotting_utils as VO_plt
 
     fig, ax = plt.subplots()
-    VO_plt.plot_vo_path_with_arrows(axis=ax, x=x_o, y=-y_o, linestyle='o--', label="Pydnet ORB VO")
+    # VO_plt.plot_vo_path_with_arrows(axis=ax, x=x_o, y=-y_o, linestyle='o--', label="Pydnet ORB VO")
     VO_plt.plot_vo_path_with_arrows(axis=ax, x=x_s, y=-y_s, linestyle='o--', label="Pydnet SIFT VO")
     VO_plt.plot_vo_path_with_arrows(axis=ax, x=x_vo, y=y_vo, linestyle='o--', label="Stereo VO")
     ax.legend()
