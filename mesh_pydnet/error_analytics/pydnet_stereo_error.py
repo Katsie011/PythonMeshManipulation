@@ -86,7 +86,7 @@ def pydnet_vs_stereo_depth(prediction:np.ndarray, frame: int, dataset: husky.Dat
 
     if use_depth:
         stereo_depth = dataset.calib.baseline[0] * (
-                    dataset.calib.cam0_camera_matrix[0, 0] * dataset.img_shape[1]) / good_disp
+                    dataset.calib.cam0_camera_matrix[0, 0]) / good_disp
         e = pred_pts - stereo_depth
     else:
         e=pred_pts-good_disp
@@ -104,7 +104,7 @@ def pydnet_vs_stereo_depth(prediction:np.ndarray, frame: int, dataset: husky.Dat
     if return_mse:
         e_ret = mse
     else:
-        e_ret = e
+        e_ret = np.abs(e)
 
     if return_pts:
         return e_ret, np.hstack((good_pts_l, good_disp.reshape((-1, 1))))
@@ -171,17 +171,24 @@ def predict_dataset_get_stereo_e(dataset, plots=True, verbose=False, training_si
 
                     mse_sift[counter] = np.mean(frame_sift_e**2)
                     if plots:
+                        disp_max=50
                         sift_disp_samples = disparity[sift_pts[:,1].astype(int), sift_pts[:,0].astype(int)]
                         im_e_sift = cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR)
                         im_disp_sift = cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR)
                         im_disp_pred = cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR)
-                        e_colors = cv2.applyColorMap((np.abs(frame_sift_e)*255/np.abs(frame_sift_e).max()).astype(np.uint8), cv2.COLORMAP_JET)
-                        stereo_disp_colors = cv2.applyColorMap((np.abs(sift_pts[:,2])*255/(np.abs(sift_pts[:,2])).max()).astype(np.uint8), cv2.COLORMAP_INFERNO)
-                        pred_disp_colors = cv2.applyColorMap((np.abs(sift_disp_samples)*255/(np.abs(sift_disp_samples).max())).astype(np.uint8), cv2.COLORMAP_INFERNO)
+                        scaled_e = (np.abs(frame_sift_e) * 255 / disp_max)
+                        scaled_e[scaled_e>255] = 255
+                        e_colors = cv2.applyColorMap(scaled_e.astype(np.uint8), cv2.COLORMAP_JET)
+                        scaled_s_dis = (np.abs(sift_pts[:, 2]) * 255 / disp_max)
+                        scaled_s_dis[scaled_s_dis>255] = 255
+                        stereo_disp_colors = cv2.applyColorMap(scaled_s_dis.astype(np.uint8), cv2.COLORMAP_INFERNO)
+                        scaled_disp_s = (np.abs(sift_disp_samples) * 255 / disp_max)
+                        scaled_disp_s[scaled_disp_s>255]=255
+                        pred_disp_colors = cv2.applyColorMap(scaled_disp_s.astype(np.uint8), cv2.COLORMAP_INFERNO)
                         for i, c in enumerate(sift_pts.astype(int)):
                             im_e_sift = cv2.circle(im_e_sift, c[:2], 2, e_colors[i].squeeze().tolist(), 2)
-                            im_disp_sift = cv2.circle(im_disp_sift, c[:2], 2, stereo_disp_colors[i].squeeze().tolist(), -1)
-                            im_disp_pred = cv2.circle(im_disp_pred, c[:2], 2, pred_disp_colors[i].squeeze().tolist(), -1)
+                            im_disp_sift = cv2.circle(im_disp_sift, c[:2], 2, stereo_disp_colors[i].squeeze().tolist(), 2)
+                            im_disp_pred = cv2.circle(im_disp_pred, c[:2], 2, pred_disp_colors[i].squeeze().tolist(), 2)
                         cv2.imshow("Error sift to pred disparities (Jet --> red is bigger e)", im_e_sift)
                         cv2.imshow("Sift disparities", im_disp_sift)
                         cv2.imshow("Predicted disparities", im_disp_pred)
