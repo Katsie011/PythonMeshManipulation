@@ -15,9 +15,11 @@ from reconstruction.HyperParameters import *
 import utilities.HuskyDataHandler as husky
 import reconstruction.VOComparison.aru_visual_odometry as vocomp
 import utilities.ImgFeatureExtactorModule as ft
+import sys
 
-from pydnet.utils import *
-from pydnet.pydnet import *
+sys.path.append("/home/kats/Code/aru_sil_py/reconstruction/mesh_pydnet/pydnet")
+from utils import *
+from pydnet import *
 
 sift = ft.FeatureDetector(det_type='sift', max_num_ft=2000)
 orb = ft.FeatureDetector(det_type='orb', max_num_ft=2000)

@@ -1,15 +1,8 @@
 TensorFlow 2.0 Upgrade Script
 -----------------------------
 Converted 8 files
-Detected 9 issues that require attention
+Detected 5 issues that require attention
 --------------------------------------------------------------------------------
---------------------------------------------------------------------------------
-File: ./layers.py
---------------------------------------------------------------------------------
-./layers.py:33:12: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
-./layers.py:34:11: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
-./layers.py:45:12: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
-./layers.py:46:11: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
 --------------------------------------------------------------------------------
 File: ./monodepth_simple.py
 --------------------------------------------------------------------------------
@@ -30,243 +23,68 @@ Input tree: './'
 ================================================================================
 --------------------------------------------------------------------------------
 Processing file './monodepth_model.py'
- outputting to '../training_tf2/monodepth_model.py'
+ outputting to 'tf2_converted/monodepth_model.py'
 --------------------------------------------------------------------------------
 
-72:12: INFO: Added keywords to args of function 'tf.shape'
-75:15: INFO: Changed tf.image.resize_nearest_neighbor call to tf.image.resize(..., method=tf.image.ResizeMethod.NEAREST_NEIGHBOR).
-79:12: INFO: Added keywords to args of function 'tf.shape'
-86:39: INFO: Changed tf.image.resize_area call to tf.image.resize(..., method=tf.image.ResizeMethod.AREA).
-120:29: INFO: Added keywords to args of function 'tf.reduce_mean'
-120:29: INFO: Renamed keyword argument for tf.reduce_mean from keep_dims to keepdims
-121:29: INFO: Added keywords to args of function 'tf.reduce_mean'
-121:29: INFO: Renamed keyword argument for tf.reduce_mean from keep_dims to keepdims
-130:17: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-162:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-172:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-177:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-182:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-187:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-191:49: INFO: Added keywords to args of function 'tf.reduce_mean'
-193:49: INFO: Added keywords to args of function 'tf.reduce_mean'
-197:36: INFO: Added keywords to args of function 'tf.reduce_mean'
-199:36: INFO: Added keywords to args of function 'tf.reduce_mean'
-207:36: INFO: Added keywords to args of function 'tf.reduce_mean'
-208:36: INFO: Added keywords to args of function 'tf.reduce_mean'
-212:34: INFO: Added keywords to args of function 'tf.reduce_mean'
-213:34: INFO: Added keywords to args of function 'tf.reduce_mean'
-223:16: INFO: tf.summary.scalar requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-223:16: INFO: Renamed 'tf.summary.scalar' to 'tf.compat.v1.summary.scalar'
-224:16: INFO: tf.summary.scalar requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-224:16: INFO: Renamed 'tf.summary.scalar' to 'tf.compat.v1.summary.scalar'
-225:16: INFO: tf.summary.scalar requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-225:16: INFO: Renamed 'tf.summary.scalar' to 'tf.compat.v1.summary.scalar'
-226:16: INFO: tf.summary.scalar requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-226:16: INFO: Renamed 'tf.summary.scalar' to 'tf.compat.v1.summary.scalar'
-227:16: INFO: tf.summary.scalar requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-227:16: INFO: Renamed 'tf.summary.scalar' to 'tf.compat.v1.summary.scalar'
-228:16: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-228:16: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-229:16: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-229:16: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-232:20: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-232:20: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-233:20: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-233:20: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-234:20: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-234:20: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-235:20: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-235:20: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-236:20: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-236:20: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-237:20: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-237:20: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-240:16: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-240:16: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
-241:16: INFO: tf.summary.image requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-241:16: INFO: Renamed 'tf.summary.image' to 'tf.compat.v1.summary.image'
+
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Processing file './pydnet.py'
- outputting to '../training_tf2/pydnet.py'
+ outputting to 'tf2_converted/pydnet.py'
 --------------------------------------------------------------------------------
 
-35:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-38:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-39:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-42:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-45:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-46:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-49:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-52:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-53:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-56:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-59:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-60:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-63:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-66:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-67:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-70:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-73:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-74:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-82:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-84:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-87:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-89:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-92:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-94:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-97:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-99:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-102:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-104:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-107:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-109:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-120:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-122:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-124:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-126:11: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-142:14: INFO: Added keywords to args of function 'tf.shape'
-144:21: INFO: Renamed 'tf.image.resize_images' to 'tf.image.resize'
-144:63: INFO: Renamed 'tf.image.resize_images' to 'tf.image.resize'
-144:105: INFO: Renamed 'tf.image.resize_images' to 'tf.image.resize'
+
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Processing file './bilinear_sampler.py'
- outputting to '../training_tf2/bilinear_sampler.py'
+ outputting to 'tf2_converted/bilinear_sampler.py'
 --------------------------------------------------------------------------------
 
-22:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-27:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-33:21: INFO: Added keywords to args of function 'tf.pad'
-69:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-91:9: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-92:24: INFO: Added keywords to args of function 'tf.shape'
-93:24: INFO: Added keywords to args of function 'tf.shape'
-94:24: INFO: Added keywords to args of function 'tf.shape'
-95:24: INFO: Added keywords to args of function 'tf.shape'
+
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Processing file './monodepth_dataloader.py'
- outputting to '../training_tf2/monodepth_dataloader.py'
+ outputting to 'tf2_converted/monodepth_dataloader.py'
 --------------------------------------------------------------------------------
 
-17:9: INFO: Renamed 'tf.py_func' to 'tf.compat.v1.py_func'
-31:22: INFO: Renamed 'tf.train.string_input_producer' to 'tf.compat.v1.train.string_input_producer'
-32:22: INFO: Renamed 'tf.TextLineReader' to 'tf.compat.v1.TextLineReader'
-35:21: INFO: Renamed 'tf.string_split' to 'tf.compat.v1.string_split'
-39:31: INFO: Renamed 'tf.string_join' to 'tf.strings.join'
-42:31: INFO: Renamed 'tf.string_join' to 'tf.strings.join'
-43:31: INFO: Renamed 'tf.string_join' to 'tf.strings.join'
-49:22: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
-50:26: INFO: Added keywords to args of function 'tf.cond'
-51:26: INFO: Added keywords to args of function 'tf.cond'
-54:26: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
-55:38: INFO: Added keywords to args of function 'tf.cond'
-63:60: INFO: Renamed 'tf.train.shuffle_batch' to 'tf.compat.v1.train.shuffle_batch'
-76:23: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
-81:28: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
-86:24: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
-87:25: INFO: Added keywords to args of function 'tf.shape'
-87:50: INFO: Added keywords to args of function 'tf.shape'
-101:25: INFO: Added keywords to args of function 'tf.substr'
-101:25: INFO: Renamed 'tf.substr' to 'tf.strings.substr'
-104:17: INFO: Added keywords to args of function 'tf.cond'
-104:65: INFO: Renamed 'tf.read_file' to 'tf.io.read_file'
-104:120: INFO: Renamed 'tf.read_file' to 'tf.io.read_file'
-108:26: INFO: Added keywords to args of function 'tf.shape'
-113:17: INFO: Renamed 'tf.image.resize_images' to 'tf.image.resize'
+
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Processing file './layers.py'
- outputting to '../training_tf2/layers.py'
+ outputting to 'tf2_converted/layers.py'
 --------------------------------------------------------------------------------
 
-33:12: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
-33:12: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
-33:65: INFO: Changing tf.contrib.layers xavier initializer to a tf.compat.v1.keras.initializers.VarianceScaling and converting arguments.
 
-34:11: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
-34:11: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
-34:61: INFO: tf.truncated_normal_initializer requires manual check. Initializers no longer have the dtype argument in the constructor or partition_info argument in the __call__ method.
-The calls have been converted to compat.v1 for safety (even though they may already have been correct).
-34:61: INFO: Renamed 'tf.truncated_normal_initializer' to 'tf.compat.v1.truncated_normal_initializer'
-35:11: INFO: Added keywords to args of function 'tf.nn.conv2d'
-35:11: INFO: Renamed keyword argument for tf.nn.conv2d from filter to filters
-45:12: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
-45:12: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
-45:65: INFO: Changing tf.contrib.layers xavier initializer to a tf.compat.v1.keras.initializers.VarianceScaling and converting arguments.
-
-46:11: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
-46:11: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
-46:61: INFO: tf.truncated_normal_initializer requires manual check. Initializers no longer have the dtype argument in the constructor or partition_info argument in the __call__ method.
-The calls have been converted to compat.v1 for safety (even though they may already have been correct).
-46:61: INFO: Renamed 'tf.truncated_normal_initializer' to 'tf.compat.v1.truncated_normal_initializer'
-47:12: INFO: Added keywords to args of function 'tf.shape'
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Processing file './monodepth_simple.py'
- outputting to '../training_tf2/monodepth_simple.py'
+ outputting to 'tf2_converted/monodepth_simple.py'
 --------------------------------------------------------------------------------
 
-52:12: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
-62:13: INFO: Renamed 'tf.ConfigProto' to 'tf.compat.v1.ConfigProto'
-63:11: INFO: Renamed 'tf.Session' to 'tf.compat.v1.Session'
-66:18: INFO: Renamed 'tf.train.Saver' to 'tf.compat.v1.train.Saver'
-69:13: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
-70:13: INFO: Renamed 'tf.local_variables_initializer' to 'tf.compat.v1.local_variables_initializer'
-72:14: INFO: Renamed 'tf.train.start_queue_runners' to 'tf.compat.v1.train.start_queue_runners'
 84:4: WARNING: *.save requires manual check. (This warning is only applicable if the code saves a tf.Keras model) Keras model.save now saves to the Tensorflow SavedModel format by default, instead of HDF5. To continue saving to HDF5, add the argument save_format='h5' to the save() function.
-110:4: INFO: Renamed 'tf.app.run' to 'tf.compat.v1.app.run'
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Processing file './monodepth_main.py'
- outputting to '../training_tf2/monodepth_main.py'
+ outputting to 'tf2_converted/monodepth_main.py'
 --------------------------------------------------------------------------------
 
-88:24: INFO: Renamed 'tf.train.piecewise_constant' to 'tf.compat.v1.train.piecewise_constant'
-90:19: INFO: Renamed 'tf.train.AdamOptimizer' to 'tf.compat.v1.train.AdamOptimizer'
-106:13: INFO: Renamed 'tf.variable_scope' to 'tf.compat.v1.variable_scope'
-106:31: INFO: Renamed 'tf.get_variable_scope' to 'tf.compat.v1.get_variable_scope'
-125:21: INFO: Added keywords to args of function 'tf.reduce_mean'
-127:8: INFO: tf.summary.scalar requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-127:8: INFO: Renamed 'tf.summary.scalar' to 'tf.compat.v1.summary.scalar'
-128:8: INFO: tf.summary.scalar requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-128:8: INFO: Renamed 'tf.summary.scalar' to 'tf.compat.v1.summary.scalar'
-129:21: INFO: tf.summary.merge_all requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-129:21: INFO: Renamed 'tf.summary.merge_all' to 'tf.compat.v1.summary.merge_all'
-132:17: INFO: Renamed 'tf.ConfigProto' to 'tf.compat.v1.ConfigProto'
-133:15: INFO: Renamed 'tf.Session' to 'tf.compat.v1.Session'
-136:25: INFO: tf.summary.FileWriter requires manual check. The TF 1.x summary API cannot be automatically migrated to TF 2.0, so symbols have been converted to tf.compat.v1.summary.* and must be migrated manually. Typical usage will only require changes to the summary writing logic, not to individual calls like scalar(). For examples of the new summary API, see the Effective TF 2.0 migration document or check the TF 2.0 TensorBoard tutorials.
-136:25: INFO: Renamed 'tf.summary.FileWriter' to 'tf.compat.v1.summary.FileWriter'
-137:22: INFO: Renamed 'tf.train.Saver' to 'tf.compat.v1.train.Saver'
-141:24: INFO: Renamed 'tf.trainable_variables' to 'tf.compat.v1.trainable_variables'
-146:17: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
-147:17: INFO: Renamed 'tf.local_variables_initializer' to 'tf.compat.v1.local_variables_initializer'
-149:18: INFO: Renamed 'tf.train.start_queue_runners' to 'tf.compat.v1.train.start_queue_runners'
 174:16: WARNING: *.save requires manual check. (This warning is only applicable if the code saves a tf.Keras model) Keras model.save now saves to the Tensorflow SavedModel format by default, instead of HDF5. To continue saving to HDF5, add the argument save_format='h5' to the save() function.
 176:8: WARNING: *.save requires manual check. (This warning is only applicable if the code saves a tf.Keras model) Keras model.save now saves to the Tensorflow SavedModel format by default, instead of HDF5. To continue saving to HDF5, add the argument save_format='h5' to the save() function.
-188:13: INFO: Renamed 'tf.ConfigProto' to 'tf.compat.v1.ConfigProto'
-189:11: INFO: Renamed 'tf.Session' to 'tf.compat.v1.Session'
-192:18: INFO: Renamed 'tf.train.Saver' to 'tf.compat.v1.train.Saver'
-195:13: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
-196:13: INFO: Renamed 'tf.local_variables_initializer' to 'tf.compat.v1.local_variables_initializer'
-198:14: INFO: Renamed 'tf.train.start_queue_runners' to 'tf.compat.v1.train.start_queue_runners'
 224:4: WARNING: *.save requires manual check. (This warning is only applicable if the code saves a tf.Keras model) Keras model.save now saves to the Tensorflow SavedModel format by default, instead of HDF5. To continue saving to HDF5, add the argument save_format='h5' to the save() function.
 225:4: WARNING: *.save requires manual check. (This warning is only applicable if the code saves a tf.Keras model) Keras model.save now saves to the Tensorflow SavedModel format by default, instead of HDF5. To continue saving to HDF5, add the argument save_format='h5' to the save() function.
-252:4: INFO: Renamed 'tf.app.run' to 'tf.compat.v1.app.run'
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 Processing file './average_gradients.py'
- outputting to '../training_tf2/average_gradients.py'
+ outputting to 'tf2_converted/average_gradients.py'
 --------------------------------------------------------------------------------
 
-34:15: INFO: Added keywords to args of function 'tf.reduce_mean'
+
 --------------------------------------------------------------------------------
 
