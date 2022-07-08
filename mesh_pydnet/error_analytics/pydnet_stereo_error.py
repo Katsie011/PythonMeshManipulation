@@ -68,9 +68,14 @@ def get_stereo_disp(imgl, imgr, det=sift):
     disp = (pts_l[:, 0] - pts_r[:, 0])
     return disp, pts_l, pts_r
 
-def pydnet_vs_stereo_depth(prediction:np.ndarray, frame: int, dataset: husky.DatasetHandler, det=sift, use_depth = False, return_pts = False, epipolar_window=2):
+def pydnet_vs_stereo_depth(prediction:np.ndarray, frame: int, dataset: husky.DatasetHandler, det=sift, use_depth = False, return_mse=True, return_pts = False, epipolar_window=2):
     imgl= dataset.get_cam0(frame)
     imgr = dataset.get_cam1(frame)
+
+    if imgl.shape[:2] != prediction.shape:
+        imgl = cv2.resize(imgl, prediction.shape[::-1])
+        imgr = cv2.resize(imgr, prediction.shape[::-1])
+
     disp, pts_l, pts_r = get_stereo_disp(imgl, imgr, det=det)
     good_disp_idx = (disp > 0) & (np.abs(pts_l[:,1]-pts_r[:,1]) < epipolar_window)
     good_pts_l = pts_l[good_disp_idx]
@@ -95,9 +100,15 @@ def pydnet_vs_stereo_depth(prediction:np.ndarray, frame: int, dataset: husky.Dat
           f"\tAvg stereo disparity: {good_disp.mean():.5f}, \sigma ={good_disp.std()}\n"
           f"\tAvg predicted disparity: {pred_pts.mean():.5f}, \sigma ={pred_pts.std()}\n"
           )
+
+    if return_mse:
+        e_ret = mse
+    else:
+        e_ret = e
+
     if return_pts:
-        return mse, good_pts_l
-    return mse
+        return e_ret, np.hstack((good_pts_l, good_disp.reshape((-1, 1))))
+    return e_ret
 
 
 
@@ -150,26 +161,48 @@ def predict_dataset_get_stereo_e(dataset, plots=True, verbose=False, training_si
                 if verbose: print(f"Time to predict image of size {training_size}: {time_pred}")
 
                 if get_sift:
-                    mse_sift[counter], sift_pts = pydnet_vs_stereo_depth(prediction=fullsize_disparity, frame=counter,
-                                                                         dataset=dataset, det=sift, return_pts=True,
+                    # mse_sift[counter], sift_pts = pydnet_vs_stereo_depth(prediction=fullsize_disparity, frame=counter,
+                    #                                                      dataset=dataset, det=sift, return_pts=True,
+                    #                                                      use_depth=False)
+                    print("\nEval on training size:")
+                    frame_sift_e, sift_pts = pydnet_vs_stereo_depth(prediction=disparity, frame=counter,
+                                                                         dataset=dataset, det=sift, return_pts=True, return_mse= False,
                                                                          use_depth=False)
-                    if plots:
-                        sift_im = cv2.cvtColor(imgl, cv2.COLOR_RGB2BGR)
-                        for c in sift_pts.astype(int):
-                            sift_im = cv2.circle(sift_im, c, 5, (0, 0, 255), 2)
 
-                        cv2.imshow("Sift Points", cv2.resize(sift_im, (dataset.img_shape[1]//2, dataset.img_shape[0]//2)))
+                    mse_sift[counter] = np.mean(frame_sift_e**2)
+                    if plots:
+                        sift_disp_samples = disparity[sift_pts[:,1].astype(int), sift_pts[:,0].astype(int)]
+                        im_e_sift = cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR)
+                        im_disp_sift = cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR)
+                        im_disp_pred = cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR)
+                        e_colors = cv2.applyColorMap((np.abs(frame_sift_e)*255/np.abs(frame_sift_e).max()).astype(np.uint8), cv2.COLORMAP_JET)
+                        stereo_disp_colors = cv2.applyColorMap((np.abs(sift_pts[:,2])*255/(np.abs(sift_pts[:,2])).max()).astype(np.uint8), cv2.COLORMAP_INFERNO)
+                        pred_disp_colors = cv2.applyColorMap((np.abs(sift_disp_samples)*255/(np.abs(sift_disp_samples).max())).astype(np.uint8), cv2.COLORMAP_INFERNO)
+                        for i, c in enumerate(sift_pts.astype(int)):
+                            im_e_sift = cv2.circle(im_e_sift, c[:2], 2, e_colors[i].squeeze().tolist(), 2)
+                            im_disp_sift = cv2.circle(im_disp_sift, c[:2], 2, stereo_disp_colors[i].squeeze().tolist(), -1)
+                            im_disp_pred = cv2.circle(im_disp_pred, c[:2], 2, pred_disp_colors[i].squeeze().tolist(), -1)
+                        cv2.imshow("Error sift to pred disparities (Jet --> red is bigger e)", im_e_sift)
+                        cv2.imshow("Sift disparities", im_disp_sift)
+                        cv2.imshow("Predicted disparities", im_disp_pred)
+
 
                 if get_orb:
-                    mse_orb[counter], orb_pts = pydnet_vs_stereo_depth(prediction=fullsize_disparity, frame=counter,
+                    print("\nEval on training size:")
+
+                    mse_orb[counter], orb_pts = pydnet_vs_stereo_depth(prediction=disparity, frame=counter,
                                                                        dataset=dataset, det=orb, return_pts=True,
                                                                        use_depth=False)
-                    if plots:
-                        orb_im = cv2.cvtColor(imgl, cv2.COLOR_RGB2BGR)
-                        for c in orb_pts.astype(int):
-                            orb_im = cv2.circle(orb_im, c, 5, (0, 0, 255), 2)
 
-                        cv2.imshow("Orb Points", cv2.resize(orb_im, (dataset.img_shape[1]//2, dataset.img_shape[0]//2)))
+                    # mse_orb[counter], orb_pts = pydnet_vs_stereo_depth(prediction=fullsize_disparity, frame=counter,
+                    #                                                    dataset=dataset, det=orb, return_pts=True,
+                    #                                                    use_depth=False)
+                    if plots:
+                        orb_im = cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR)
+                        for c in orb_pts.astype(int):
+                            orb_im = cv2.circle(orb_im, c, 2, (0, 0, 255), 2)
+
+                        cv2.imshow("Orb Points", orb_im)
 
 
 
@@ -178,9 +211,13 @@ def predict_dataset_get_stereo_e(dataset, plots=True, verbose=False, training_si
                     f"\nTook {end_loop_time - start_loop_time:.3f}s to run one iteration with SIFT and ORB VO together")
 
                 if plots:
-                    img_and_depth = np.hstack((cv2.cvtColor(imgl, cv2.COLOR_RGB2BGR), cv2.applyColorMap(
-                        (fullsize_disparity*255/fullsize_disparity.max()).astype(np.uint8),cv2.COLORMAP_PLASMA)))
-                    cv2.imshow("Input and disparity", cv2.resize(img_and_depth, (dataset.img_shape[1], dataset.img_shape[0]//2)))
+                    if get_sift:
+                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(im_disp_sift, disparity.shape[::-1]), cv2.COLOR_RGB2BGR), cv2.applyColorMap(
+                        (disparity*255/disparity.max()).astype(np.uint8),cv2.COLORMAP_INFERNO)))
+                    else:
+                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(imgl, disparity.shape[::-1]), cv2.COLOR_RGB2BGR), cv2.applyColorMap(
+                        (disparity*255/disparity.max()).astype(np.uint8),cv2.COLORMAP_INFERNO)))
+                    cv2.imshow("Input and disparity", img_and_depth)
                     cv2.waitKey(20)
 
     # Returning points
