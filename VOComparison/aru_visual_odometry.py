@@ -19,6 +19,7 @@ from reconstruction.TunableReconstruction.Functions_TunableReconstruction import
 from reconstruction.TunableReconstruction.Functions_TunableReconstruction import disparity_to_depth
 import utilities.Transform as Transform
 import utilities.Image as img_utils
+import utilities.HuskyDataHandler as husky
 
 # Temp:
 import utilities.image_similarity as im_sim
@@ -29,15 +30,115 @@ pyvo = aru_py_vo.PyVO(
     '/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/VOComparison/config/vo_config.yaml')
 
 
-def read_predictions(prediction_path):
-    pass
+
+
+def get_stereo_disp(kpsl, desl, kpsr, desr, det=sift, lowes_ratio: float = 0.9):
+    good_matches = det.get_matches(desl, desr, lowes_ratio=lowes_ratio)
+    idxl, idxr = det.matches_and_keypts_to_good_idxs(good_matches, kps_l=kpsl, kps_r=kpsr)
+    kpsl=kpsl[idxl]
+    kpsr = kpsr[idxr]
+    pts_l = det.kp_to_pts(kpsl)
+    pts_r = det.kp_to_pts(kpsr)
+
+    # train_idxs = np.zeros(len(good_matches), dtype=int)
+    # query_idxs = np.zeros(len(good_matches), dtype=int)
+    #
+    # for i, m in enumerate(good_matches):
+    #     train_idxs[i] = m.trainIdx
+    #     query_idxs[i] = m.queryIdx
+    #
+    # kpsl = np.array(kpsl, dtype=object)
+    # kpsr = np.array(kpsr, dtype=object)
+    #
+    # pts_l = det.kp_to_pts(kpsl[query_idxs])
+    # pts_r = det.kp_to_pts(kpsr[train_idxs])
+
+    disp = (pts_l[:, 0] - pts_r[:, 0])
+    return disp, pts_l, pts_r
+
+
+def get_good_stereo_depth(kpsl, desl, kpsr, desr, dataset: husky.DatasetHandler, det=sift, use_disparity=True,
+                          epipolar_window=2):
+    disp, pts_l, pts_r = get_stereo_disp(kpsl, desl, kpsr, desr, det=det)
+    good_disp_idx = (disp > 0) & (np.abs(pts_l[:, 1] - pts_r[:, 1]) < epipolar_window)
+    good_pts_l = pts_l[good_disp_idx]
+    good_pts_r = pts_r[good_disp_idx]
+    good_disp = disp[good_disp_idx]
+
+    if not use_disparity:
+        d = dataset.calib.baseline[0] * (
+            dataset.calib.cam0_camera_matrix[0, 0]) / good_disp
+    else:
+        d = good_disp
+    return np.stack((good_pts_l[:, 0], good_pts_l[:, 1], d), axis=1)
+
+
+def get_stereo_motion_est_vo(stereo_left_n, stereo_right_n, left_np1,
+                             dataset_obj: husky.DatasetHandler,
+                             det_obj=sift, epipolar_window: int = 2,
+                             py_vo_obj: aru_py_vo.PyVO = pyvo, lowes_ratio: float = 0.9):
+    # TODO finish this and get the vo using input stereo disparity
+    kpsl0, desl0 = det_obj.detect(stereo_left_n)
+    kpsl1, desl1 = det_obj.detect(left_np1)
+    kpsr0, desr0 = det_obj.detect(stereo_right_n)
+
+    # Getting the stereo depth and the indicies of the good matches
+    # f0_stereo_pts = get_good_stereo_depth(kpsl0, desl0, kpsr0, desr0, dataset=dataset_obj,
+    #                                                      use_disparity=False)
+
+
+    # getting matches left to right frame 0
+    good_matches = det_obj.get_matches(desl0, desr0, lowes_ratio=lowes_ratio)
+    idx_l0_l_to_r, idx_r0_l_to_r = det_obj.matches_and_keypts_to_good_idxs(good_matches, kps_l=kpsl0, kps_r=kpsr0)
+    matched_kpsl0 = np.array(kpsl0, dtype=object)[idx_l0_l_to_r]
+    matched_kpsr = np.array(kpsr0, dtype=object)[idx_r0_l_to_r]
+    pts_l_f0, pts_r_f0 =det_obj.kp_to_pts(matched_kpsl0), det_obj.kp_to_pts(matched_kpsr)
+    disp = (pts_l_f0[:, 0] - pts_r_f0[:, 0])
+    good_disp_idx = (disp > 0) & (np.abs(pts_l_f0[:, 1] - pts_r_f0[:, 1]) < epipolar_window)
+    good_disp = disp[good_disp_idx]
+
+    # matching the good points in the first stereo pair to the next frame
+    matches_f0_f1 = det_obj.get_matches(desl0, desl1, lowes_ratio=lowes_ratio)
+    idx_l0_f0to1, idx_l1_f0to1 = det_obj.matches_and_keypts_to_good_idxs(matches_f0_f1, kps_l=matched_kpsl0, kps_r=kpsl1)
+    # matched_kpsl0 = np.array(matched_kpsr, dtype=object)[idx_l0_f0to1]
+    matched_kpsl1 = np.array(kpsl1, dtype=object)[idx_l1_f0to1]
+
+
+    # get the stereo depths that match to a point in the next frame:
+    #   - First combine index selections
+    idx = np.zeros(len(kpsl0), dtype=bool)
+    idx_f0tof1 = idx.copy(); idx_f0tof1[idx_l0_f0to1] = True
+    idx_l_to_r = idx.copy(); idx_l_to_r[idx_l0_l_to_r] = True
+    valid_disp_pts = idx_f0tof1[idx_l_to_r]
+    valid_good_disp = valid_disp_pts[good_disp_idx]
+    matched_disp = good_disp[valid_good_disp]
+
+    stereo_depths = dataset.calib.baseline[0] * (dataset.calib.cam0_camera_matrix[0, 0]) / matched_disp
+    left_stereo_uv = pts_l_f0[np.logical_and(good_disp_idx, valid_disp_pts)]
+    #       - Use this to select final stereo/3D points from frame 0
+    pts3d = np.stack((left_stereo_uv[:,0], left_stereo_uv[:,1], stereo_depths), axis=1)
+
+    # get the positions of the good points in the next frame:
+    f1_uv_pts = det_obj.kp_to_pts(matched_kpsl1)
+
+    assert f1_uv_pts.shape == pts3d.shape, "The shapes of the 3D points and the next frame uv points"
+
+    #TODO The shapes arent matching
+    # Need to check that the indices are working correctly
+    # not sure what is right and what is not.
+    return py_vo_obj.motion_estimation(pts3d, f1_uv_pts)
+
+
+
+
+
 
 
 def get_vo(frame0, frame1, data, pyvo=pyvo):
-    stereo_left_n = cv2.cvtColor(data.get_cam0(frame0), cv2.COLOR_BGR2GRAY)
-    stereo_right_n = cv2.cvtColor(data.get_cam1(frame0), cv2.COLOR_BGR2GRAY)
-    stereo_left_np1 = cv2.cvtColor(data.get_cam0(frame1), cv2.COLOR_BGR2GRAY)
-    stereo_right_np1 = cv2.cvtColor(data.get_cam1(frame1), cv2.COLOR_BGR2GRAY)
+    stereo_left_n = data.get_cam0(frame0)
+    stereo_right_n = data.get_cam1(frame0)
+    stereo_left_np1 = data.get_cam0(frame1)
+    stereo_right_np1 = data.get_cam1(frame1)
 
     t1 = data.left_times[frame1].astype(np.int64)
     t0 = data.left_times[frame0].astype(np.int64)
@@ -150,6 +251,9 @@ def get_img_ft_pts(img_f0, img_f1, det=orb, lowes_ratio=0.7):
         uv_img0
         uv_img1
     """
+
+    # TODO redundant. Use descripter matches
+
     kps0, des0 = det.detect(img_f0)
     kps1, des1 = det.detect(img_f1)
 
@@ -181,6 +285,37 @@ def get_num_similar_fts(im0, im1, use_sift=True, lowes_ratio=0.8):
         kps1, des1 = orb.detect(im1)
         return len(orb.get_matches(des0, des1, lowes_ratio=lowes_ratio))
 
+
+def motion_est_from_ft_pts(uv_f0, uv_f1, depth, K, min_matches=50, vo=pyvo, verify_trans=True,
+                               max_step_d=2):
+    """
+    Calculate the estimated motion for a given depth image
+    """
+    # if len(uv1) < min_matches:
+    #     return None
+    pt_u0, pt_v0 = uv_f0.T.astype(int)
+
+    # Extracting camera parameters
+    cx = K[0, 2]
+    cy = K[1, 2]
+    fx = K[0, 0]
+    fy = K[1, 1]
+
+    # getting 3d points in frame 0
+    # pt_u0 = np.floor(u0 * depth_f0.shape[1] / img_f0.shape[1]).astype(int)
+    # pt_v0 = np.floor(v0 * depth_f0.shape[0] / img_f0.shape[0]).astype(int)
+    x_cam = (pt_u0 - cx) * depth / fx
+    y_cam = (pt_v0 - cy) * depth / fy
+    z_cam = depth
+    pts3d = np.stack((x_cam, y_cam, z_cam), axis=1)
+
+    if not verify_trans:
+        return vo.motion_estimation(pts3d, uv_f1)
+    t = vo.motion_estimation(pts3d, uv_f1)
+    dist, deg = Transform.distance_and_yaw_from_transform(t)
+    if dist > max_step_d:  # only append if moved less than 2m. at 0.1s per frame, that's faster than ...
+        return None
+    return t
 
 def predicted_depth_motion_est(depth_f0, img_f0, img_f1, K, det=orb, min_matches=50, vo=pyvo, verify_trans=True,
                                max_step_d=2):
@@ -269,7 +404,7 @@ def get_vo_path_on_dataset(dataset, start_frame=None, stop_frame=None, validate=
     return generate_transform_path(transforms, validate=validate)
 
 
-def vo_on_bag(bag: rosbag.Bag, max_d_per_step: int=2, camera_config_path: str=None,
+def vo_on_bag(bag: rosbag.Bag, max_d_per_step: int = 2, camera_config_path: str = None,
               stereo_topic="/camera/image_stereo/image_raw", left_topic='/camera/image_left/image_raw',
               right_topic='/camera/image_right/image_raw'):
     """
@@ -359,3 +494,10 @@ def vo_on_bag(bag: rosbag.Bag, max_d_per_step: int=2, camera_config_path: str=No
         else:
             print(f"Invalid transform at frame {i} \twith dist {dist:.2f}")
     return x_vals, y_vals
+
+
+if __name__=="__main__":
+    dataset = husky.DatasetHandler("/home/kats/Datasets/Route A/2022_07_06_10_48_24")
+
+    f=0
+    print(get_stereo_motion_est_vo(dataset.get_cam0(f), dataset.get_cam1(f), dataset.get_cam0(f+1), dataset))
