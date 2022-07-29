@@ -77,11 +77,11 @@ def make_train_test_lists(data_dir, test_dir, training_dir, make_test=True, make
                 if velo_flag:
                     velo = husky_data.get_lidar(i)
                 # continue
-                im_left_path = os.path.join(training_dir, 'image_00/data', left)
-                cv2.imwrite(im_left_path, im_left)
+                im_left_path = os.path.join(training_dir, 'image_00', left)
+                # cv2.imwrite(im_left_path, im_left)
 
-                im_right_path = os.path.join(training_dir, 'image_01/data', right)
-                cv2.imwrite(im_right_path, im_right)
+                im_right_path = os.path.join(training_dir, 'image_01', right)
+                # cv2.imwrite(im_right_path, im_right)
 
                 train_line = f"image_00/data/{left} image_01/data/{right}\n"
                 if make_training_list_files:
