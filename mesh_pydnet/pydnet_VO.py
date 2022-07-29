@@ -34,7 +34,10 @@ parser.add_argument('--datapath', type=str, help='path to the data',
 #                     help='output directory for test disparities, if empty outputs to checkpoint folder',
 #                     default=output_directory)
 parser.add_argument('--checkpoint_dir', type=str, help='path to a specific checkpoint to load',
-                    default='/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet/checkpoints/Husky10K/Husky')
+                    # default='/home/kats/Documents/My Documents/UCT/Masters/Code/PythonMeshManipulation/mesh_pydnet
+                    # /checkpoints/Husky10K/Husky')
+                    default='/home/kats/Code/aru_sil_py/reconstruction/mesh_pydnet/checkpoints/MtrxGodzilla/'
+                            'PydnetTransferHusky10k/model-117950')
 parser.add_argument('--resolution', type=int, default=1, help='resolution [1:H, 2:Q, 3:E]')
 parser.add_argument('--save_predictions', type=bool, help="save predicted disparities to output directory",
                     default=True)
@@ -141,9 +144,6 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
     #
     #     # plt.show()
 
-
-
-
     with tf.Graph().as_default():
         placeholders, model, init, loader, saver = init_pydepth()
         show_flag = True
@@ -165,9 +165,12 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                 disp = sess.run(model.results[args.resolution - 1], feed_dict={placeholders['im0']: img})
                 end_pred = time.time()
                 time_pred = start_pred - end_pred
-                disparity = disp[0, :, :, 0].squeeze() * 0.3 * train_width
+                # disparity = disp[0, :, :, 0].squeeze() * 0.3 * train_width
+                # For some reason, removing the scaling factor of 0.3  increases accuracy and almost matches the stereo
+                disparity = disp[0, :, :, 0].squeeze() * train_width
                 # disparity[disparity<MAX_DISPARITY] = MAX_DISPARITY
-                depth = dataset.calib.baseline[0] * (dataset.calib.cam0_camera_matrix[0, 0] * train_width / input_shape[1]) / disparity
+                depth = dataset.calib.baseline[0] * (
+                            dataset.calib.cam0_camera_matrix[0, 0] * train_width / input_shape[1]) / disparity
                 depth[depth > MAX_DISTANCE] = MAX_DISTANCE
                 fullsize_depth = cv2.resize(depth, (full_width, full_height))
                 if verbose: print(f"Time to predict image of size {training_size}: {time_pred}")
@@ -192,12 +195,10 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                         matches = orb.get_matches(des0, des1, lowes_ratio=0.7)
                         # kps0_img.set_data(cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
                         # kps1_img.set_data(cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT))
-                        img_kps0= cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+                        img_kps0 = cv2.drawKeypoints(imgl, kps0, 0, (0, 255, 0), flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
                         # img_kps1= cv2.drawKeypoints(imgl_p1, kps1, 0, (0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
 
                         # cv2.imshow("ORBKeypointsImg", cv2.resize(np.hstack((img_kps0, img_kps1)), (full_width, full_height//2)))
-
-
 
                     if orb_transform is not None:
                         orb_coords = orb_coords @ orb_transform
@@ -237,11 +238,13 @@ def predict_dataset(dataset, plots=True, verbose=False, training_size=(256, 512)
                 if plots:
 
                     if get_sift:
-                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(img_kps0, disparity.shape[::-1]), cv2.COLOR_RGB2BGR), cv2.applyColorMap(
-                        (disparity*255/disparity.max()).astype(np.uint8),cv2.COLORMAP_INFERNO)))
+                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(img_kps0, disparity.shape[::-1]),
+                                                                cv2.COLOR_RGB2BGR), cv2.applyColorMap(
+                            (disparity * 255 / disparity.max()).astype(np.uint8), cv2.COLORMAP_INFERNO)))
                     else:
-                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(img_kps0, disparity.shape[::-1]), cv2.COLOR_RGB2BGR), cv2.applyColorMap(
-                        (disparity*255/disparity.max()).astype(np.uint8),cv2.COLORMAP_INFERNO)))
+                        img_and_depth = np.hstack((cv2.cvtColor(cv2.resize(img_kps0, disparity.shape[::-1]),
+                                                                cv2.COLOR_RGB2BGR), cv2.applyColorMap(
+                            (disparity * 255 / disparity.max()).astype(np.uint8), cv2.COLORMAP_INFERNO)))
                     cv2.imshow("Input and disparity", img_and_depth)
                     cv2.waitKey(20)
 
@@ -262,9 +265,10 @@ if __name__ == "__main__":
     #       "/media/kats/Katsoulis3/Datasets/Husky/extracted_data/old_zoo/Route B/2022_05_04_09_38_30"]
 
     data_dir = "/home/kats/Datasets/Whitelab/Dataset_Structures/2022_07_04_10_26_41"
+    # data_dir = "/home/kats/Datasets/Route A/2022_07_06_10_48_24"
     dataset_obj = husky.DatasetHandler(data_dir, time_tolerance=0.5)
     print(f"Predicting for bag:\n{data_dir}")
-    num_frames = None
+    num_frames = 1000
 
     # [x_o, y_o], [x_s, y_s] = predict_dataset(dataset=dataset_obj, plots=True, max_frames=num_frames)
     # [x_o, y_o] = predict_dataset(dataset=dataset_obj, plots=False, max_frames=num_frames, get_orb=True, get_sift=False)
